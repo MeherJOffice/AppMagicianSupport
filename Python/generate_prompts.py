@@ -98,7 +98,9 @@ def main():
         for pat in FORBIDDEN:
             if re.search(pat, p, re.I):
                 return False, "forbidden:" + pat
-        if not re.search(r'\b(pubspec\.yaml|analysis_options\.yaml|lib/[^\s]+\.dart|test/[^\s]+_test\.dart|ios/[^\s]+)\b', p):
+        # More flexible validation - allow prompts that mention files, directories, or development concepts
+        has_development_reference = bool(re.search(r'\b(pubspec\.yaml|analysis_options\.yaml|lib/|test/|ios/|\.dart|\.arb|\.yaml|\.plist|dependencies|localization|theme|widget|repository|entity|model)\b', p))
+        if not has_development_reference:
             return False, "no_explicit_file_paths"
         return True, "ok"
 
