@@ -27,6 +27,7 @@ pipeline {
     APP_ROOT = "${HOME}/AppMagician"
     DEBUG_MODE = '1'                                     // Enable debug output
     TEST_MODE = "${params.TEST_MODE ? '1' : '0'}"       // Pass test mode parameter
+    STRICT_LINTING = "${params.STRICT_LINTING ? '1' : '0'}"      // Pass strict linting parameter
     STRICT_VALIDATION = "${params.STRICT_VALIDATION ? '1' : '0'}"  // Pass strict validation parameter
     ENABLE_PIPELINE_MONITORING = "${params.ENABLE_PIPELINE_MONITORING ? '1' : '0'}"  // Pass pipeline monitoring parameter
     GENERATE_PIPELINE_REPORT = "${params.GENERATE_PIPELINE_REPORT ? '1' : '0'}"  // Pass pipeline report parameter
@@ -116,7 +117,7 @@ stage('Create project under ~/AppMagician/<AppName>') {
 
         APP_DIR="$SANITIZED"
         BUNDLE_ID="${BUNDLE_ID:-com.example.generated}"
-        APP_ORG="$(printf '%s' "$BUNDLE_ID" | sed -E 's/\\.[^.]+$//')"
+        APP_ORG="$(printf '%s' "$BUNDLE_ID" | sed -E 's/\.[^.]+$//')"
         APP_ROOT="${APP_ROOT:-$HOME/AppMagician}"
 
         mkdir -p "${APP_ROOT}"
@@ -158,7 +159,7 @@ stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTI
         export CURSOR_EXIT_ON_COMPLETION=1
         export TERM=xterm-256color
 
-        APP_DIR="\$(cat out/app_dir.txt)"
+        APP_DIR="$(cat out/app_dir.txt)"
         cd "${APP_ROOT}/${APP_DIR}"
 
         SPEC="${WORKSPACE}/out/app_spec.json"
@@ -211,21 +212,26 @@ DART
         }
 
         run_checks() {
+          # macOS-friendly hashing function
+          hash_file() { command -v md5sum >/dev/null 2>&1 && md5sum "$1" | awk '{print $1}' || md5 -q "$1"; }
+          
           seed_smoke_test_if_empty
           
           # Conditional flutter pub get - only when pubspec.yaml changes
-          if [ -f pubspec.yaml ] && [ .pubspec.hash != "$(md5sum pubspec.yaml 2>/dev/null || echo 'no-hash')" ]; then
+          old_hash="$( [ -f .pubspec.hash ] && cat .pubspec.hash || echo none )"
+          new_hash="$(hash_file pubspec.yaml || echo none)"
+          if [ "$old_hash" != "$new_hash" ]; then
             echo "📦 Dependencies changed - running flutter pub get"
             flutter pub get >/dev/null 2>&1 || true
-            md5sum pubspec.yaml > .pubspec.hash 2>/dev/null || true
+            echo "$new_hash" > .pubspec.hash
           else
             echo "📦 Dependencies unchanged - skipping flutter pub get"
           fi
           
           set +e
           
-          # Conditional flutter analyze - only for Dart-related steps
-          if [[ "${STEP:-}" =~ (dart|lib/|test/) ]] || [ -z "${STEP:-}" ]; then
+          # Conditional flutter analyze - only for Dart-related steps  
+          if echo "${STEP:-}" | grep -E "(dart|lib/|test/)" >/dev/null || [ -z "${STEP:-}" ]; then
             echo "🔍 Running flutter analyze (Dart code may have changed)"
             flutter analyze > .an.out 2>&1; ANALYZE_RC=$?
           else
@@ -237,7 +243,7 @@ DART
           set -e
           
           # Check if strict linting is enabled
-          if [ "${STRICT_LINTING}" = "true" ]; then
+          if [ "${STRICT_LINTING}" = "1" ]; then
             # Strict mode: fail on any analyze issues
             if [ $ANALYZE_RC -eq 0 ] && [ $TEST_RC -eq 0 ]; then
               echo "✅ Analyze & tests passed (strict mode)."
@@ -267,7 +273,10 @@ DART
           fi
         }
 
-        ask_fix() {
+          ask_fix() {
+          # macOS-friendly hashing function
+          hash_file() { command -v md5sum >/dev/null 2>&1 && md5sum "$1" | awk '{print $1}' || md5 -q "$1"; }
+          
           local STEP_NO="$1"
           export STEP="step ${STEP_NO}"
           : > .an.tail; : > .ts.tail
@@ -277,10 +286,12 @@ DART
           python3 "${WORKSPACE}/Python/cursor_fix.py"
           
           # Only run flutter pub get if pubspec.yaml might have changed during fix
-          if [ -f pubspec.yaml ] && [ .pubspec.hash != "$(md5sum pubspec.yaml 2>/dev/null || echo 'no-hash')" ]; then
+          old_hash="$( [ -f .pubspec.hash ] && cat .pubspec.hash || echo none )"
+          new_hash="$(hash_file pubspec.yaml || echo none)"
+          if [ "$old_hash" != "$new_hash" ]; then
             echo "📦 Fix may have changed dependencies - running flutter pub get"
             flutter pub get >/dev/null 2>&1 || true
-            md5sum pubspec.yaml > .pubspec.hash 2>/dev/null || true
+            echo "$new_hash" > .pubspec.hash
           fi
         }
 
@@ -360,7 +371,7 @@ DART
                 fi
               else
                 echo "ℹ️  No specific form screen found - checking for general form elements..."
-                if find lib/features -name "*screen.dart" -exec grep -l "Form\\\\|TextFormField\\\\|ElevatedButton\\\\|TextField" {} \\; | head -1; then
+                if find lib/features -name "*screen.dart" -exec grep -l "Form\\|TextFormField\\|ElevatedButton\\|TextField" {} \; | head -1; then
                   echo "✅ Form elements found in screens"
                 else
                   echo "❌ No form elements found"
@@ -414,7 +425,7 @@ DART
                 python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
               else
                 echo "ℹ️  No settings screen found - checking for general settings elements..."
-                if find lib/features -name "*screen.dart" -exec grep -l "settings\\\\|Settings" {} \\; | head -1; then
+                if find lib/features -name "*screen.dart" -exec grep -l "settings\\|Settings" {} \; | head -1; then
                   echo "✅ Settings elements found"
                 else
                   echo "❌ No settings elements found"
@@ -594,7 +605,7 @@ stage('Final Integration Validation') {
     withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
       sh '''
         set -euo pipefail
-        APP_DIR="\$(cat out/app_dir.txt)"
+        APP_DIR="$(cat out/app_dir.txt)"
         cd "${APP_ROOT}/${APP_DIR}"
         
         echo "🔍 Running final integration validation..."
@@ -679,13 +690,18 @@ COMPLETION REQUIREMENT:
 EOT
 
 run_checks() {
+  # macOS-friendly hashing function
+  hash_file() { command -v md5sum >/dev/null 2>&1 && md5sum "$1" | awk '{print $1}' || md5 -q "$1"; }
+  
   set +e
   
   # Conditional flutter pub get - only when pubspec.yaml changes
-  if [ -f pubspec.yaml ] && [ .pubspec.hash != "$(md5sum pubspec.yaml 2>/dev/null || echo 'no-hash')" ]; then
+  old_hash="$( [ -f .pubspec.hash ] && cat .pubspec.hash || echo none )"
+  new_hash="$(hash_file pubspec.yaml || echo none)"
+  if [ "$old_hash" != "$new_hash" ]; then
     echo "📦 Build stage: Dependencies changed - running flutter pub get"
     flutter pub get > .pub.out 2>&1
-    md5sum pubspec.yaml > .pubspec.hash 2>/dev/null || true
+    echo "$new_hash" > .pubspec.hash
   else
     echo "📦 Build stage: Dependencies unchanged - skipping flutter pub get"
     echo "Dependencies unchanged" > .pub.out
@@ -749,10 +765,12 @@ PROMPT
   python3 "${WORKSPACE}/Python/build_fix.py"
 
   # Refresh deps after edits - only if pubspec.yaml changed
-  if [ -f pubspec.yaml ] && [ .pubspec.hash != "$(md5sum pubspec.yaml 2>/dev/null || echo 'no-hash')" ]; then
+  old_hash="$( [ -f .pubspec.hash ] && cat .pubspec.hash || echo none )"
+  new_hash="$(hash_file pubspec.yaml || echo none)"
+  if [ "$old_hash" != "$new_hash" ]; then
     echo "📦 Build fix: Dependencies changed - running flutter pub get"
     flutter pub get >/dev/null 2>&1 || true
-    md5sum pubspec.yaml > .pubspec.hash 2>/dev/null || true
+    echo "$new_hash" > .pubspec.hash
   fi
 }
 
@@ -795,48 +813,48 @@ fi
       withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
         sh '''
           set -euo pipefail
-          APP_DIR="\\$(cat out/app_dir.txt)"
-          cd "\${APP_ROOT}/\${APP_DIR}"
+          APP_DIR="$(cat out/app_dir.txt)"
+          cd "${APP_ROOT}/${APP_DIR}"
           
           echo "Collecting comprehensive pipeline metrics..."
           echo "=============================================="
           
           # Collect current metrics and save to database
-          python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --collect-metrics 
-            --app-root "\${APP_ROOT}/\${APP_DIR}" 
-            --pipeline-id "\${PIPELINE_ID}" 
-            --db-path "\${WORKSPACE}/pipeline_metrics.db" || true
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --collect-metrics \
+            --app-root "${APP_ROOT}/${APP_DIR}" \
+            --pipeline-id "${PIPELINE_ID}" \
+            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           
           # Generate health report if requested
-          if [ "\${GENERATE_PIPELINE_REPORT}" = "1" ]; then
+          if [ "${GENERATE_PIPELINE_REPORT}" = "1" ]; then
             echo "Generating comprehensive pipeline health report..."
-            python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --report 
-              --db-path "\${WORKSPACE}/pipeline_metrics.db" > "\${WORKSPACE}/pipeline_health_report.txt" || true
+            python3 "${WORKSPACE}/Python/pipeline_monitor.py" --report \
+              --db-path "${WORKSPACE}/pipeline_metrics.db" > "${WORKSPACE}/pipeline_health_report.txt" || true
             
             echo "Pipeline Health Report:"
             echo "========================="
-            cat "\${WORKSPACE}/pipeline_health_report.txt" || true
+            cat "${WORKSPACE}/pipeline_health_report.txt" || true
             echo "========================="
           fi
           
           # Generate dashboard view
           echo "Pipeline Dashboard:"
           echo "====================="
-          python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --dashboard 
-            --db-path "\${WORKSPACE}/pipeline_metrics.db" || true
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --dashboard \
+            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           echo "====================="
           
           # Export metrics for historical analysis
           echo "Exporting metrics for historical analysis..."
-          python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --export json 
-            --db-path "\${WORKSPACE}/pipeline_metrics.db" || true
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --export json \
+            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           
           echo "Pipeline monitoring completed"
         '''
       }
     }
   }
-}
+}}
 
   post {
     success {
