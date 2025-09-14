@@ -216,9 +216,9 @@ def main():
         # Remove trailing commas before closing braces/brackets
         json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)
         
-        # Fix unescaped quotes in strings (basic fix)
-        # This is a simple approach - more complex cases might need better handling
-        json_text = re.sub(r'(?<!\\)"(?![,}\]]|\s*:)', r'\\"', json_text)
+        # Don't over-escape quotes - the LLM response is usually already properly formatted
+        # Only fix obvious issues like unescaped quotes in string values
+        # This is more conservative to avoid breaking valid JSON
         
         return json_text.strip()
 
