@@ -795,7 +795,7 @@ fi
       withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
         sh '''
           set -euo pipefail
-          APP_DIR="\$(cat out/app_dir.txt)"
+          APP_DIR="\\$(cat out/app_dir.txt)"
           cd "\${APP_ROOT}/\${APP_DIR}"
           
           echo "Collecting comprehensive pipeline metrics..."
@@ -832,7 +832,7 @@ fi
             --db-path "\${WORKSPACE}/pipeline_metrics.db" || true
           
           echo "Pipeline monitoring completed"
-        ''
+        '''
       }
     }
   }
