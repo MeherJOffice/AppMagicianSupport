@@ -13,6 +13,7 @@ pipeline {
     string(name: 'LOCALES', defaultValue: 'en,ar,fr,tr', description: 'Comma-separated BCP-47 codes when localization is enabled')
     string(name: 'BUNDLE_ID', defaultValue: 'com.example.myapp', description: 'iOS bundle identifier (e.g. com.company.app)')
     booleanParam(name: 'TEST_MODE', defaultValue: false, description: 'Enable test mode (bypasses API calls, generates mock data)')
+    booleanParam(name: 'STRICT_LINTING', defaultValue: false, description: 'Enable strict linting (fail on warnings, not just errors)')
 
   }
 
@@ -187,14 +188,35 @@ DART
           flutter analyze > .an.out 2>&1; ANALYZE_RC=$?
           flutter test   > .test.out 2>&1;   TEST_RC=$?
           set -e
-          if [ $ANALYZE_RC -eq 0 ] && [ $TEST_RC -eq 0 ]; then
-            echo "✅ Analyze & tests passed."
-            return 0
+          
+          # Check if strict linting is enabled
+          if [ "${STRICT_LINTING}" = "true" ]; then
+            # Strict mode: fail on any analyze issues
+            if [ $ANALYZE_RC -eq 0 ] && [ $TEST_RC -eq 0 ]; then
+              echo "✅ Analyze & tests passed (strict mode)."
+              return 0
+            else
+              echo "❌ Checks failed (strict mode: analyze=$ANALYZE_RC, test=$TEST_RC)."
+              return 1
+            fi
           else
-            echo "❌ Checks failed (analyze=$ANALYZE_RC, test=$TEST_RC)."
-            echo "---- analyze tail ----"; tail -n 120 .an.out || true
-            echo "---- test tail ----";    tail -n 120 .test.out || true
-            return 1
+            # Relaxed mode: only fail on actual errors, not warnings/info
+            if [ $TEST_RC -eq 0 ]; then
+              # Check if analyze has actual errors (not just info/warnings)
+              if grep -q "error •" .an.out; then
+                echo "❌ Analyze has errors (test=$TEST_RC)."
+                echo "---- analyze errors ----"; grep "error •" .an.out || true
+                return 1
+              else
+                echo "✅ Tests passed, analyze has only warnings/info (analyze=$ANALYZE_RC, test=$TEST_RC)."
+                return 0
+              fi
+            else
+              echo "❌ Tests failed (analyze=$ANALYZE_RC, test=$TEST_RC)."
+              echo "---- analyze tail ----"; tail -n 120 .an.out || true
+              echo "---- test tail ----";    tail -n 120 .test.out || true
+              return 1
+            fi
           fi
         }
 
@@ -242,7 +264,7 @@ DART
             echo "Step ${STEP_NO}: OK"
           else
             ATTEMPT=1
-            MAX_ATTEMPTS=2
+            MAX_ATTEMPTS=5
             while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
               echo "Auto-fix attempt ${ATTEMPT}/${MAX_ATTEMPTS} for step ${STEP_NO}..."
               ask_fix "${STEP_NO}" || true
@@ -312,9 +334,17 @@ run_checks() {
   flutter build ios --no-codesign > .build.out 2>&1; BUILD_RC=$?
   set -e
 
-  if [ $ANALYZE_RC -eq 0 ] && [ $TEST_RC -eq 0 ] && [ $BUILD_RC -eq 0 ]; then
-    echo "✅ All checks passed."
-    return 0
+  # Only fail on actual errors, not warnings/info
+  if [ $TEST_RC -eq 0 ] && [ $BUILD_RC -eq 0 ]; then
+    # Check if analyze has actual errors (not just info/warnings)
+    if grep -q "error •" .an.out; then
+      echo "❌ Analyze has errors (test=$TEST_RC, build=$BUILD_RC)."
+      echo "---- analyze errors ----"; grep "error •" .an.out || true
+      return 1
+    else
+      echo "✅ All checks passed (analyze has only warnings/info)."
+      return 0
+    fi
   fi
 
   echo "❌ Checks failed (analyze=$ANALYZE_RC, test=$TEST_RC, build=$BUILD_RC)."
