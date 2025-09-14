@@ -221,8 +221,8 @@ def main():
                 "validation_criteria": {
                     "file_exists": "pubspec.yaml",
                     "contains_dependencies": ["flutter_localizations", "intl", "provider", "shared_preferences"],
-                    "no_unused_deps": true,
-                    "version_compatible": true
+                    "no_unused_deps": True,
+                    "version_compatible": True
                 }
             },
             {
@@ -230,8 +230,8 @@ def main():
                 "validation_criteria": {
                     "file_exists": "lib/l10n/app_en.arb",
                     "contains_keys": ["app_title", "settings", "language", "theme", "notifications", "save", "cancel"],
-                    "no_placeholders": true,
-                    "complete_sentences": true
+                    "no_placeholders": True,
+                    "complete_sentences": True
                 }
             },
             {
@@ -239,8 +239,8 @@ def main():
                 "validation_criteria": {
                     "file_exists": "lib/l10n/app_ar.arb",
                     "contains_keys": ["app_title", "settings", "language", "theme", "notifications", "save", "cancel"],
-                    "arabic_text": true,
-                    "rtl_support": true
+                    "arabic_text": True,
+                    "rtl_support": True
                 }
             },
             {
@@ -249,19 +249,19 @@ def main():
                     "file_exists": "lib/l10n/app_localizations.dart",
                     "contains_class": "AppLocalizations",
                     "extends_delegate": "LocalizationsDelegate",
-                    "has_rtl_support": true,
-                    "has_fallback": true
+                    "has_rtl_support": True,
+                    "has_fallback": True
                 }
             },
             {
                 "prompt": "Create lib/main.dart: Replace default counter app with MaterialApp 3.0. Set supportedLocales to [Locale('en'), Locale('ar')], localizationsDelegates with AppLocalizations.delegate, localeResolutionCallback for fallback, theme with Material 3.0 colors, and home pointing to MainScreen(). Remove all counter app code.",
                 "validation_criteria": {
                     "file_exists": "lib/main.dart",
-                    "contains_materialapp": true,
+                    "contains_materialapp": True,
                     "supported_locales": ["en", "ar"],
                     "localizations_delegate": "AppLocalizations.delegate",
-                    "no_counter_code": true,
-                    "material_3_theme": true
+                    "no_counter_code": True,
+                    "material_3_theme": True
                 }
             },
             {
@@ -269,11 +269,11 @@ def main():
                 "validation_criteria": {
                     "file_exists": "lib/features/settings/presentation/screens/settings_screen.dart",
                     "contains_class": "SettingsScreen",
-                    "has_language_switcher": true,
-                    "has_theme_toggle": true,
-                    "has_notification_prefs": true,
-                    "material_3_design": true,
-                    "rtl_support": true
+                    "has_language_switcher": True,
+                    "has_theme_toggle": True,
+                    "has_notification_prefs": True,
+                    "material_3_design": True,
+                    "rtl_support": True
                 }
             },
             {
@@ -281,10 +281,10 @@ def main():
                 "validation_criteria": {
                     "file_exists": "lib/features/settings/presentation/providers/settings_provider.dart",
                     "contains_class": "SettingsProvider",
-                    "extends_changenotifier": true,
+                    "extends_changenotifier": True,
                     "has_methods": ["setLanguage", "setTheme", "getLanguage", "getTheme", "loadSettings", "saveSettings"],
-                    "uses_sharedpreferences": true,
-                    "has_error_handling": true
+                    "uses_sharedpreferences": True,
+                    "has_error_handling": True
                 }
             },
             {
@@ -293,8 +293,8 @@ def main():
                     "file_exists": "lib/features/settings/data/repositories/settings_repository.dart",
                     "contains_class": "SettingsRepository",
                     "has_methods": ["saveLanguage", "saveTheme", "getLanguage", "getTheme"],
-                    "uses_sharedpreferences": true,
-                    "has_error_handling": true
+                    "uses_sharedpreferences": True,
+                    "has_error_handling": True
                 }
             },
             {
@@ -302,11 +302,11 @@ def main():
                 "validation_criteria": {
                     "file_exists": "lib/features/core/presentation/screens/main_screen.dart",
                     "contains_class": "MainScreen",
-                    "has_bottom_navigation": true,
+                    "has_bottom_navigation": True,
                     "has_tabs": ["Home", "Settings"],
-                    "no_counter_references": true,
-                    "no_fake_data": true,
-                    "rtl_support": true
+                    "no_counter_references": True,
+                    "no_fake_data": True,
+                    "rtl_support": True
                 }
             },
             {
@@ -315,10 +315,10 @@ def main():
                     "file_exists": "lib/features/core/presentation/widgets/app_drawer.dart",
                     "contains_class": "AppDrawer",
                     "has_navigation_items": ["Home", "Settings", "About"],
-                    "has_language_switcher": true,
-                    "has_theme_toggle": true,
-                    "material_3_design": true,
-                    "rtl_support": true
+                    "has_language_switcher": True,
+                    "has_theme_toggle": True,
+                    "material_3_design": True,
+                    "rtl_support": True
                 }
             },
             {
@@ -326,11 +326,11 @@ def main():
                 "validation_criteria": {
                     "file_exists": "lib/features/core/presentation/widgets/loading_widget.dart",
                     "contains_class": "LoadingWidget",
-                    "has_circular_progress": true,
-                    "has_loading_text": true,
-                    "has_error_state": true,
-                    "has_retry_button": true,
-                    "localized_text": true
+                    "has_circular_progress": True,
+                    "has_loading_text": True,
+                    "has_error_state": True,
+                    "has_retry_button": True,
+                    "localized_text": True
                 }
             },
             {
@@ -338,11 +338,11 @@ def main():
                 "validation_criteria": {
                     "file_exists": "lib/features/core/presentation/widgets/error_widget.dart",
                     "contains_class": "ErrorWidget",
-                    "has_error_icon": true,
-                    "has_error_message": true,
-                    "has_retry_button": true,
-                    "accessible": true,
-                    "localized": true
+                    "has_error_icon": True,
+                    "has_error_message": True,
+                    "has_retry_button": True,
+                    "accessible": True,
+                    "localized": True
                 }
             },
             {
@@ -351,7 +351,7 @@ def main():
                     "file_exists": "ios/Runner/Info.plist",
                     "has_cfbundle_localizations": ["en", "ar"],
                     "has_cfbundle_development_region": "en",
-                    "no_unused_configs": true
+                    "no_unused_configs": True
                 }
             },
             {
@@ -366,10 +366,10 @@ def main():
                 "prompt": "Write test/features/core/main_screen_test.dart: Widget tests for MainScreen including navigation, RTL layout, and accessibility. Test language switching and theme changes (optional - non-critical for app functionality).",
                 "validation_criteria": {
                     "file_exists": "test/features/core/main_screen_test.dart",
-                    "has_widget_tests": true,
-                    "tests_navigation": true,
-                    "tests_rtl_layout": true,
-                    "tests_accessibility": true
+                    "has_widget_tests": True,
+                    "tests_navigation": True,
+                    "tests_rtl_layout": True,
+                    "tests_accessibility": True
                 }
             }
         ],
@@ -434,7 +434,7 @@ Return JSON EXACTLY with keys:
         "file_exists": "path/to/file.dart",
         "contains_class": "ClassName",
         "has_methods": ["method1", "method2"],
-        "specific_requirements": true
+        "specific_requirements": True
       }}
     }},
     {{
@@ -442,7 +442,7 @@ Return JSON EXACTLY with keys:
       "validation_criteria": {{
         "file_exists": "path/to/file.dart",
         "contains_pattern": "specific content pattern",
-        "functional_requirement": true
+        "functional_requirement": True
       }}
     }}
   ],
