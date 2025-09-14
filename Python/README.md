@@ -120,6 +120,35 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   python3 Python/cleanup_placeholders.py --verbose
   ```
 
+### `quality_gates.py`
+- **Purpose**: Runs comprehensive quality checks for Flutter iOS apps
+- **Usage**: Command line tool to validate app quality
+- **Arguments**:
+  - `--app-root`: Path to app root directory (optional)
+  - `--min-coverage`: Minimum test coverage percentage (default: 70.0)
+  - `--json-output`: Output results to JSON file (optional)
+- **Environment Variables**:
+  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
+- **Quality Checks**:
+  - Flutter analyze (errors only, not warnings)
+  - Flutter tests (all tests must pass)
+  - Test coverage (minimum threshold)
+  - Dependencies (all resolved)
+  - Build success (iOS build --no-codesign)
+  - Localization files (properly generated)
+  - Hardcoded strings (none found)
+  - Provider initialization (properly configured)
+- **Exit Codes**:
+  - `0`: All quality gates passed
+  - `1`: One or more quality gates failed
+- **Examples**:
+  ```bash
+  python3 Python/quality_gates.py
+  python3 Python/quality_gates.py --min-coverage 80
+  python3 Python/quality_gates.py --json-output report.json
+  ```
+
 ## Requirements
 
 - Python 3.6+
