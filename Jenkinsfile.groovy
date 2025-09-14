@@ -90,7 +90,7 @@ stage('Generate idea + prompts (ChatGPT or DeepSeek)') {
     }
   }
 }
-
+}
 
 
 
