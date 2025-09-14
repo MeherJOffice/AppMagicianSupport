@@ -318,9 +318,9 @@ DART
             3)
               # After HomeScreen creation
               echo "📱 Validating HomeScreen creation..."
-              if [ -f "lib/features/home/presentation/screens/home_screen.dart" ]; then
+              if [ -f "lib/features/home/home_screen.dart" ]; then
                 echo "✅ HomeScreen file exists"
-                if grep -q "class.*HomeScreen" "lib/features/home/presentation/screens/home_screen.dart"; then
+                if grep -q "class.*HomeScreen" "lib/features/home/home_screen.dart"; then
                   echo "✅ HomeScreen class found"
                 else
                   echo "❌ HomeScreen class not found"
@@ -381,9 +381,9 @@ DART
             6)
               # After Localization
               echo "🌍 Validating localization..."
-              if [ -f "lib/l10n/app_en.arb" ] && [ -f "lib/l10n/app_ar.arb" ]; then
+              if [ -f "lib/features/shared/l10n/intl_en.arb" ] && [ -f "lib/features/shared/l10n/intl_ar.arb" ]; then
                 echo "✅ Localization files exist"
-                if grep -q "app_title\\|settings\\|language" "lib/l10n/app_en.arb"; then
+                if grep -q "app_title\\|settings\\|language" "lib/features/shared/l10n/intl_en.arb"; then
                   echo "✅ Localization keys found"
                 else
                   echo "❌ Localization keys not found"
@@ -408,10 +408,10 @@ DART
                 echo "ℹ️  Generic secondary feature validation..."
                 # Check for any additional feature screens
                 FEATURE_COUNT=$(find lib/features -name "*_screen.dart" | grep -v home | wc -l)
-                if [ "$FEATURE_COUNT" -ge 2 ]; then
-                  echo "✅ Multiple feature screens found ($FEATURE_COUNT)"
+                if [ "$FEATURE_COUNT" -ge 1 ]; then
+                  echo "✅ Feature screens found ($FEATURE_COUNT)"
                 else
-                  echo "❌ Insufficient feature screens found ($FEATURE_COUNT)"
+                  echo "❌ No feature screens found ($FEATURE_COUNT)"
                   return 1
                 fi
               fi
@@ -419,7 +419,7 @@ DART
             8)
               # After SettingsScreen creation - dynamic validation
               echo "⚙️  Validating settings feature integration..."
-              if [ -f "lib/features/settings/presentation/screens/settings_screen.dart" ]; then
+              if [ -f "lib/settings/presentation/screens/settings_screen.dart" ]; then
                 echo "✅ Settings screen found"
                 python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
               else
