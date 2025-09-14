@@ -271,7 +271,7 @@ Return JSON EXACTLY with keys:
         ]}
         try:
             if os.environ.get('DEBUG_MODE') == '1':
-                print(f"DEBUG: Attempting API call {attempts}/3", file=sys.stderr)
+                print(f"DEBUG: Attempting API call {attempts}/3 with model: {model}", file=sys.stderr)
             data = call_api(body)
             content = strip_code_fences(data["choices"][0]["message"]["content"])
             if os.environ.get('DEBUG_MODE') == '1':
@@ -283,7 +283,7 @@ Return JSON EXACTLY with keys:
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: JSON decode error: {e}", file=sys.stderr)
                 print(f"DEBUG: Content preview: {content[:200]}...", file=sys.stderr)
-            if provider == 'chatgpt' and model != 'gpt-4o-mini':
+            if provider == 'chatgpt' and model not in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
                 model = 'gpt-4o-mini'
                 continue
             print("LLM response was not valid JSON:", e, file=sys.stderr)
@@ -291,7 +291,7 @@ Return JSON EXACTLY with keys:
         except Exception as e:
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: API call failed: {e}", file=sys.stderr)
-            if provider == 'chatgpt' and model != 'gpt-4o-mini':
+            if provider == 'chatgpt' and model not in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
                 model = 'gpt-4o-mini'
                 continue
             print("LLM call/parse failed:", e, file=sys.stderr)
@@ -321,6 +321,8 @@ Return JSON EXACTLY with keys:
     print("Model:", model)
     print("App name:", obj.get("app_name"))
     print("Prompts:", len(obj.get("cursor_prompts", [])))
+    if os.environ.get('DEBUG_MODE') == '1':
+        print(f"DEBUG: Final model used: {model}", file=sys.stderr)
 
 
 if __name__ == "__main__":

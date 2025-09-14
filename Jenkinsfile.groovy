@@ -3,7 +3,7 @@ pipeline {
 
   parameters {
     choice(name: 'LLM_PROVIDER', choices: ['chatgpt','deepseek'], description: 'Which LLM to use for generating the prompts')
-    choice(name: 'OPENAI_MODEL', choices: ['gpt-4o-mini','gpt-4o','gpt-5'], description: 'OpenAI model (when LLM_PROVIDER=chatgpt)')
+    choice(name: 'OPENAI_MODEL', choices: ['gpt-4o-mini','gpt-4o','gpt-4-turbo'], description: 'OpenAI model (when LLM_PROVIDER=chatgpt)')
     string(name: 'DEEPSEEK_MODEL', defaultValue: 'deepseek-chat', description: 'DeepSeek model (when LLM_PROVIDER=deepseek)')
     string(name: 'APP_DIR', defaultValue: 'chatgpt_ios_app', description: 'Fallback app name if the model omits one')
     choice(name: 'DEFAULT_LOCALE', choices: ['en','ar'], description: 'Default locale in prompts')
