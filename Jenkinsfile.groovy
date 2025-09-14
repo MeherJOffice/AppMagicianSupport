@@ -14,6 +14,7 @@ pipeline {
     string(name: 'BUNDLE_ID', defaultValue: 'com.example.myapp', description: 'iOS bundle identifier (e.g. com.company.app)')
     booleanParam(name: 'TEST_MODE', defaultValue: false, description: 'Enable test mode (bypasses API calls, generates mock data)')
     booleanParam(name: 'STRICT_LINTING', defaultValue: false, description: 'Enable strict linting (fail on warnings, not just errors)')
+    booleanParam(name: 'STRICT_VALIDATION', defaultValue: true, description: 'Enable strict validation (fail build on validation failures)')
 
   }
 
@@ -24,6 +25,7 @@ pipeline {
     APP_ROOT = "${HOME}/AppMagician"
     DEBUG_MODE = '1'                                     // Enable debug output
     TEST_MODE = "${params.TEST_MODE ? '1' : '0'}"       // Pass test mode parameter
+    STRICT_VALIDATION = "${params.STRICT_VALIDATION ? '1' : '0'}"  // Pass strict validation parameter
   }
 
   options { timestamps(); ansiColor('xterm'); disableConcurrentBuilds() }
@@ -268,6 +270,138 @@ DART
           python3 "${WORKSPACE}/Python/cursor_run.py"
         }
 
+        # Validation functions for each step
+        validate_step() {
+          local STEP_NO="$1"
+          local STEP_CONTENT="$2"
+          
+          echo "🔍 Running validation for step ${STEP_NO}..."
+          
+          case "$STEP_NO" in
+            3)
+              # After HomeScreen creation
+              echo "📱 Validating HomeScreen creation..."
+              if [ -f "lib/features/home/presentation/screens/home_screen.dart" ]; then
+                echo "✅ HomeScreen file exists"
+                if grep -q "class.*HomeScreen" "lib/features/home/presentation/screens/home_screen.dart"; then
+                  echo "✅ HomeScreen class found"
+                else
+                  echo "❌ HomeScreen class not found"
+                  return 1
+                fi
+              else
+                echo "❌ HomeScreen file not found"
+                return 1
+              fi
+              ;;
+            4)
+              # After ExpensesScreen creation
+              echo "💰 Validating expenses feature integration..."
+              python3 "${WORKSPACE}/Python/validate_feature.py" expenses || return 1
+              ;;
+            5)
+              # After AddExpenseScreen creation
+              echo "➕ Validating expense forms..."
+              if [ -f "lib/features/expenses/presentation/screens/add_expense_screen.dart" ]; then
+                echo "✅ AddExpenseScreen file exists"
+                if grep -q "Form\|TextFormField\|ElevatedButton" "lib/features/expenses/presentation/screens/add_expense_screen.dart"; then
+                  echo "✅ Form elements found"
+                else
+                  echo "❌ Form elements not found"
+                  return 1
+                fi
+              else
+                echo "❌ AddExpenseScreen file not found"
+                return 1
+              fi
+              ;;
+            6)
+              # After Localization
+              echo "🌍 Validating localization..."
+              if [ -f "lib/l10n/app_en.arb" ] && [ -f "lib/l10n/app_ar.arb" ]; then
+                echo "✅ Localization files exist"
+                if grep -q "app_title\|settings\|language" "lib/l10n/app_en.arb"; then
+                  echo "✅ Localization keys found"
+                else
+                  echo "❌ Localization keys not found"
+                  return 1
+                fi
+              else
+                echo "❌ Localization files not found"
+                return 1
+              fi
+              ;;
+            7)
+              # After SavingsScreen creation
+              echo "💾 Validating savings feature integration..."
+              python3 "${WORKSPACE}/Python/validate_feature.py" savings || return 1
+              ;;
+            8)
+              # After SettingsScreen creation
+              echo "⚙️  Validating settings feature integration..."
+              python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+              ;;
+            9)
+              # After LoadingIndicator
+              echo "⏳ Validating core widgets..."
+              if [ -f "lib/core/presentation/widgets/loading_widget.dart" ]; then
+                echo "✅ LoadingWidget file exists"
+                if grep -q "CircularProgressIndicator\|LoadingWidget" "lib/core/presentation/widgets/loading_widget.dart"; then
+                  echo "✅ Loading indicator found"
+                else
+                  echo "❌ Loading indicator not found"
+                  return 1
+                fi
+              else
+                echo "❌ LoadingWidget file not found"
+                return 1
+              fi
+              ;;
+            10)
+              # After RTL support
+              echo "🔄 Validating RTL support..."
+              if grep -q "TextDirection\|RTL\|LTR" "lib/main.dart"; then
+                echo "✅ RTL support found in main.dart"
+              else
+                echo "❌ RTL support not found in main.dart"
+                return 1
+              fi
+              ;;
+            11)
+              # After Dependencies
+              echo "📦 Validating dependencies..."
+              if [ -f "pubspec.yaml" ]; then
+                echo "✅ pubspec.yaml exists"
+                if grep -q "provider\|riverpod\|shared_preferences\|flutter_localizations" "pubspec.yaml"; then
+                  echo "✅ Required dependencies found"
+                else
+                  echo "❌ Required dependencies not found"
+                  return 1
+                fi
+              else
+                echo "❌ pubspec.yaml not found"
+                return 1
+              fi
+              ;;
+            12)
+              # After Tests
+              echo "🧪 Validating tests..."
+              if flutter test >/dev/null 2>&1; then
+                echo "✅ All tests pass"
+              else
+                echo "❌ Tests failed"
+                return 1
+              fi
+              ;;
+            *)
+              echo "ℹ️  No specific validation for step ${STEP_NO}"
+              ;;
+          esac
+          
+          echo "✅ Step ${STEP_NO} validation passed"
+          return 0
+        }
+
         # Initialize STEP variable to avoid unbound variable errors
         export STEP=""
 
@@ -290,6 +424,39 @@ DART
 
           if run_checks; then
             echo "Step ${STEP_NO}: OK"
+            
+            # Run validation for specific steps
+            if validate_step "$STEP_NO" "$(cat .prompt.raw)"; then
+              echo "✅ Step ${STEP_NO} validation passed"
+            else
+              echo "❌ Step ${STEP_NO} validation failed"
+              echo "🔄 Attempting to fix validation issues..."
+              
+              # Try to fix validation issues
+              ATTEMPT=1
+              MAX_VALIDATION_ATTEMPTS=2
+              while [ $ATTEMPT -le $MAX_VALIDATION_ATTEMPTS ]; do
+                echo "Validation fix attempt ${ATTEMPT}/${MAX_VALIDATION_ATTEMPTS} for step ${STEP_NO}..."
+                ask_fix "${STEP_NO}" || true
+                flatten_if_nested
+                
+                if validate_step "$STEP_NO" "$(cat .prompt.raw)"; then
+                  echo "✅ Step ${STEP_NO} validation passed after fix attempt ${ATTEMPT}"
+                  break
+                fi
+                ATTEMPT=$((ATTEMPT+1))
+              done
+              
+              if [ $ATTEMPT -gt $MAX_VALIDATION_ATTEMPTS ]; then
+                echo "❌ Step ${STEP_NO} validation failed after ${MAX_VALIDATION_ATTEMPTS} fix attempts"
+                if [ "${STRICT_VALIDATION}" = "1" ]; then
+                  echo "❌ Strict validation enabled - failing build"
+                  exit 1
+                else
+                  echo "⚠️  Strict validation disabled - continuing to next step"
+                fi
+              fi
+            fi
           else
             ATTEMPT=1
             MAX_ATTEMPTS=2
@@ -299,6 +466,13 @@ DART
               flatten_if_nested
               if run_checks; then
                 echo "Step ${STEP_NO}: OK after auto-fix ${ATTEMPT}"
+                
+                # Run validation after successful fix
+                if validate_step "$STEP_NO" "$(cat .prompt.raw)"; then
+                  echo "✅ Step ${STEP_NO} validation passed after auto-fix"
+                else
+                  echo "⚠️  Step ${STEP_NO} validation failed after auto-fix - continuing"
+                fi
                 break
               fi
               ATTEMPT=$((ATTEMPT+1))
@@ -313,6 +487,41 @@ DART
 
           i=$((i+1))
         done
+      '''
+    }
+  }
+}
+
+stage('Final Integration Validation') {
+  steps {
+    withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+      sh '''
+        set -euo pipefail
+        APP_DIR="$(cat out/app_dir.txt)"
+        cd "${APP_ROOT}/${APP_DIR}"
+        
+        echo "🔍 Running final integration validation..."
+        echo "=========================================="
+        
+        # Run comprehensive integration validation
+        python3 "${WORKSPACE}/Python/validate_integration.py" || {
+          echo "❌ Integration validation failed"
+          echo "🔄 Attempting to clean up placeholders..."
+          python3 "${WORKSPACE}/Python/cleanup_placeholders.py" || true
+          echo "🔄 Re-running integration validation..."
+          python3 "${WORKSPACE}/Python/validate_integration.py" || {
+            echo "❌ Integration validation still failed after cleanup"
+            if [ "${STRICT_VALIDATION}" = "1" ]; then
+              echo "❌ Strict validation enabled - failing build"
+              exit 1
+            else
+              echo "⚠️  Strict validation disabled - continuing with warnings"
+            fi
+          }
+        }
+        
+        echo "✅ Final integration validation passed"
+        echo "=========================================="
       '''
     }
   }
