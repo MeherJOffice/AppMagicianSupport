@@ -234,6 +234,43 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   python3 Python/error_recovery.py --app-root /path/to/app
   ```
 
+### `pipeline_monitor.py`
+- **Purpose**: Monitors pipeline health and generates comprehensive reports
+- **Usage**: Command line tool to track pipeline metrics and health
+- **Arguments**:
+  - `--app-root`: Path to app root directory (optional)
+  - `--db-path`: Path to SQLite database file (default: 'pipeline_metrics.db')
+  - `--report`: Generate comprehensive health report
+  - `--dashboard`: Show dashboard-like output
+  - `--export`: Export metrics to JSON or CSV format
+  - `--history`: Load metrics history for N days (default: 30)
+  - `--init-db`: Initialize database only
+- **Environment Variables**:
+  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
+- **Pipeline Monitoring Features**:
+  - Track success/failure rates of each pipeline step
+  - Monitor build times and identify bottlenecks
+  - Track test coverage trends over time
+  - Monitor code quality metrics (analyze warnings, errors)
+  - Generate pipeline health reports
+  - Alert on pipeline degradation
+  - Store metrics in SQLite database for historical analysis
+  - Provide dashboard-like output for pipeline status
+  - Export metrics to JSON/CSV formats
+  - Generate recommendations for improvement
+- **Exit Codes**:
+  - `0`: Pipeline monitoring successful
+  - `1`: Pipeline monitoring failed
+- **Examples**:
+  ```bash
+  python3 Python/pipeline_monitor.py --app-root /path/to/app
+  python3 Python/pipeline_monitor.py --report --app-root /path/to/app
+  python3 Python/pipeline_monitor.py --dashboard --app-root /path/to/app
+  python3 Python/pipeline_monitor.py --export json --app-root /path/to/app
+  python3 Python/pipeline_monitor.py --history 7 --app-root /path/to/app
+  ```
+
 ## Requirements
 
 - Python 3.6+
