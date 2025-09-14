@@ -196,7 +196,7 @@ DART
           set +e
           
           # Conditional flutter analyze - only for Dart-related steps
-          if [[ "$STEP" =~ (dart|lib/|test/) ]] || [ -z "$STEP" ]; then
+          if [[ "${STEP:-}" =~ (dart|lib/|test/) ]] || [ -z "${STEP:-}" ]; then
             echo "🔍 Running flutter analyze (Dart code may have changed)"
             flutter analyze > .an.out 2>&1; ANALYZE_RC=$?
           else
@@ -267,6 +267,9 @@ DART
         run_cursor() {
           python3 "${WORKSPACE}/Python/cursor_run.py"
         }
+
+        # Initialize STEP variable to avoid unbound variable errors
+        export STEP=""
 
         i=0
         while [ $i -lt $COUNT ]; do
