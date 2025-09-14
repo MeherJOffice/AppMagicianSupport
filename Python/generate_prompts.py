@@ -118,7 +118,18 @@ def main():
 
     def concrete_enough(prompts):
         joined = "\n".join(prompts)
-        return bool(re.search(r'\blib/[^\s]+\.dart\b', joined) and re.search(r'\btest/[^\s]+_test\.dart\b', joined))
+        # More comprehensive quality checks
+        has_dart_files = bool(re.search(r'\blib/[^\s]+\.dart\b', joined))
+        has_tests = bool(re.search(r'\btest/[^\s]+_test\.dart\b', joined))
+        has_localization = bool(re.search(r'\.arb\b|l10n|localization', joined, re.I))
+        has_modern_ui = bool(re.search(r'material|theme|ui|widget', joined, re.I))
+        has_architecture = bool(re.search(r'repository|entity|model|service', joined, re.I))
+        
+        # Require at least 4 out of 5 quality indicators
+        quality_score = sum([has_dart_files, has_tests, has_localization, has_modern_ui, has_architecture])
+        if os.environ.get('DEBUG_MODE') == '1':
+            print(f"DEBUG: Quality check - dart:{has_dart_files}, tests:{has_tests}, localization:{has_localization}, ui:{has_modern_ui}, arch:{has_architecture}, score:{quality_score}/5", file=sys.stderr)
+        return quality_score >= 4
 
     def set_is_valid(prompts):
         if not isinstance(prompts, list) or not prompts:
@@ -143,8 +154,11 @@ def main():
 
     system_msg = (
         "You are a senior Flutter iOS lead working INSIDE an existing repo. "
+        "Your task is to generate HIGH-QUALITY, PRODUCTION-READY app specifications. "
+        "Focus on POLISHED, MODERN UI/UX with proper localization support. "
         "Return STRICT JSON only. Do NOT suggest creating projects. "
-        "Every step must edit explicit files under pubspec.yaml, analysis_options.yaml, lib/**, test/**, or ios/** (safe files only)."
+        "Every step must edit explicit files under pubspec.yaml, analysis_options.yaml, lib/**, test/**, or ios/** (safe files only). "
+        "Prioritize: 1) Modern Material Design 3.0, 2) Proper RTL/LTR support, 3) Clean architecture, 4) Comprehensive testing, 5) Accessibility."
     )
 
     # App spec scaffold we want the model to follow
@@ -152,12 +166,15 @@ def main():
         "app_name": "app_generated",
         "spec": {"theme": "light", "locale": locales[0], "platforms": ["ios"], "features": ["utility"]},
         "cursor_prompts": [
-            "Edit pubspec.yaml: add needed deps (e.g., flutter_localizations).",
-            "Create lib/features/core/app_localizations.dart (if needed) or ARB/JSON setup.",
-            "Create lib/main.dart and wire MaterialApp + supportedLocales.",
-            "Create a feature under lib/features/<your_feature>/... with provider/service/widgets.",
-            "Write at least one unit test under test/features/..._test.dart.",
-            "Tighten analysis_options.yaml."
+            "Edit pubspec.yaml: add modern dependencies (flutter_localizations, material_design_icons, etc.) with latest versions.",
+            "Create lib/l10n/app_en.arb and lib/l10n/app_ar.arb: comprehensive localization files with ALL user-facing strings.",
+            "Create lib/features/core/localization/app_localizations.dart: robust RTL/LTR support with proper text direction handling.",
+            "Create lib/main.dart: setup MaterialApp 3.0 with theme, localization, RTL support, and accessibility.",
+            "Create lib/features/<feature>/presentation/widgets/<feature>_screen.dart: modern Material 3.0 UI with proper spacing, typography, and RTL layout.",
+            "Create lib/features/<feature>/data/repositories/<feature>_repository.dart: clean data layer with proper error handling.",
+            "Create lib/features/<feature>/domain/entities/<feature>_entity.dart: domain models with validation.",
+            "Write comprehensive tests: test/features/<feature>/presentation/widgets/<feature>_screen_test.dart with widget tests and accessibility tests.",
+            "Update ios/Runner/Info.plist: configure proper app metadata, supported orientations, and accessibility settings."
         ],
         "meta": {
             "requested_locales": locales,
@@ -168,21 +185,40 @@ def main():
 
     # User message that forces alignment with the hint and forbids project creation
     user_msg = f"""
-Create a small **iOS Flutter utility app idea** based on this hint (if any):
+Create a **HIGH-QUALITY iOS Flutter app** based on this idea:
 "{prompt_hint}"
 
-STRICT requirements:
-- DO NOT create projects or mention 'flutter create' or 'set up iOS platform'.
-- Generate 6–10 concrete prompts. Each prompt must specify exact files to create/modify under: pubspec.yaml, analysis_options.yaml, lib/**, test/**, ios/Runner/Info.plist.
-- Focus on the hinted idea (e.g., reminder/interval timer) and avoid unrelated "chat" features unless explicitly hinted.
-- No secrets. Read API base URL / key via runtime placeholders only when needed by the idea.
+CRITICAL QUALITY REQUIREMENTS:
+- Generate 8–12 DETAILED prompts for a POLISHED, PRODUCTION-READY app
+- Each prompt must specify EXACT files to create/modify: pubspec.yaml, analysis_options.yaml, lib/**, test/**, ios/Runner/Info.plist
+- Focus STRICTLY on the hinted idea - no unrelated features
+- MANDATORY: Full localization support for {json.dumps(locales)} with proper RTL/LTR handling
+- MANDATORY: Modern Material Design 3.0 with proper spacing, typography, and animations
+- MANDATORY: Clean architecture (presentation/data/domain layers)
+- MANDATORY: Comprehensive testing (unit, widget, integration tests)
+- MANDATORY: Accessibility support (semantics, screen readers)
+- NO secrets/hardcoded values - use proper configuration patterns
+
+LOCALIZATION REQUIREMENTS:
+- ALL user-facing text MUST be in localization files (.arb)
+- Proper RTL layout for Arabic (text direction, UI mirroring)
+- No mixed languages - either fully localized or fallback to English
+- Include proper number/date formatting for each locale
+
+UI/UX REQUIREMENTS:
+- Modern Material 3.0 design system
+- Proper color schemes and typography
+- Smooth animations and transitions
+- Responsive layout for different screen sizes
+- Loading states and error handling
+- Intuitive navigation and user flow
 
 Return JSON EXACTLY with keys:
 {{
   "app_name": "lowercase_snake_case_name",
   "spec": {{"theme":"light|dark","locale":"{locales[0]}", "platforms":["ios"], "features":["feature_name"]}},
-  "cursor_prompts": ["step 1 ...", "step 2 ...", "..."],
-  "meta": {{"requested_locales": {json.dumps(locales)}, "bundle_id_hint": "{bundle_id}", "feature_summary": "1-line feature"}}
+  "cursor_prompts": ["detailed step 1 with specific files...", "detailed step 2...", "..."],
+  "meta": {{"requested_locales": {json.dumps(locales)}, "bundle_id_hint": "{bundle_id}", "feature_summary": "1-line feature description"}}
 }}
 """
 
