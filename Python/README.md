@@ -149,6 +149,33 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   python3 Python/quality_gates.py --json-output report.json
   ```
 
+### `validate_navigation.py`
+- **Purpose**: Validates Flutter app navigation flow and structure
+- **Usage**: Command line tool to check navigation implementation
+- **Arguments**:
+  - `--app-root`: Path to app root directory (optional)
+  - `--verbose`: Enable verbose output (optional)
+- **Environment Variables**:
+  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
+- **Navigation Validation Checks**:
+  - HomeScreen navigation structure (not IndexedStack)
+  - Navigation destinations properly defined
+  - Navigation icons and labels correctly set
+  - Navigation state management working
+  - No navigation-related memory leaks
+  - Proper keyboard handling
+  - Navigation animations working correctly
+- **Exit Codes**:
+  - `0`: All navigation validations passed
+  - `1`: Navigation validation failures found
+- **Examples**:
+  ```bash
+  python3 Python/validate_navigation.py
+  python3 Python/validate_navigation.py --verbose
+  python3 Python/validate_navigation.py --app-root /path/to/app
+  ```
+
 ## Requirements
 
 - Python 3.6+
