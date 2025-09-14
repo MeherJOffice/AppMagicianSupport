@@ -117,7 +117,7 @@ stage('Create project under ~/AppMagician/<AppName>') {
 
         APP_DIR="$SANITIZED"
         BUNDLE_ID="${BUNDLE_ID:-com.example.generated}"
-        APP_ORG="$(printf '%s' "$BUNDLE_ID" | sed -E 's/\.[^.]+$//')"
+        APP_ORG="$(printf '%s' "$BUNDLE_ID" | sed -E 's/\\.[^.]+$//')"
         APP_ROOT="${APP_ROOT:-$HOME/AppMagician}"
 
         mkdir -p "${APP_ROOT}"
