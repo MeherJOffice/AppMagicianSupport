@@ -90,7 +90,7 @@ def main():
     def prompt_is_valid(p):
         if not isinstance(p, str) or not p.strip():
             return False, "empty"
-        if len(p) > 3000:  # Increased from 1000 to 3000 for more detailed prompts
+        if len(p) > 5000:  # Increased to 5000 for detailed, high-quality prompts
             return False, "too_long"
         s = p.lower()
         if '```' in p:
@@ -135,8 +135,16 @@ def main():
         if not isinstance(prompts, list) or not prompts:
             return False, ["prompts_missing"]
         problems = []
-        if not (6 <= len(prompts) <= 10):
+        if not (8 <= len(prompts) <= 12):  # Updated range for detailed prompts
             problems.append(f"count:{len(prompts)}")
+        
+        # Check total length of all prompts (should be reasonable but detailed)
+        total_length = sum(len(p) for p in prompts)
+        if os.environ.get('DEBUG_MODE') == '1':
+            print(f"DEBUG: Total prompts length: {total_length} characters", file=sys.stderr)
+        if total_length > 15000:  # Total length limit for all prompts combined
+            problems.append(f"total_length:{total_length}")
+        
         for i, p in enumerate(prompts):
             ok, why = prompt_is_valid(p)
             if not ok:
