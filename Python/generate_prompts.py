@@ -223,20 +223,12 @@ def main():
         return json_text.strip()
 
     system_msg = (
-        "You are a senior Flutter iOS lead working INSIDE an existing repo. "
-        "Your task is to generate EXTREMELY DETAILED, PRODUCTION-READY app specifications. "
-        "Each prompt must be as detailed as a human would ask ChatGPT for Cursor prompts. "
-        "Focus on POLISHED, MODERN UI/UX with working localization and NO fake data. "
-        "CRITICAL JSON FORMATTING: Return ONLY valid JSON. No markdown, no code fences, no explanations outside the JSON. "
-        "The JSON must be properly formatted with correct quotes, commas, and brackets. "
-        "Do NOT suggest creating projects. "
-        "Every step must edit explicit files under pubspec.yaml, analysis_options.yaml, lib/**, test/**, or ios/** (safe files only). "
-        "CRITICAL: Each prompt must specify exact file paths, class names, method signatures, UI components, colors, spacing, and complete implementation details. "
-        "MANDATORY: Remove all fake/placeholder data, create working localization with settings screen, implement fully functional features. "
-        "Prioritize: 1) Remove fake data, 2) Working localization, 3) Functional features, 4) Modern Material Design 3.0, 5) Proper RTL/LTR support. "
-        "PUT widget tests as the FINAL step - they are optional and non-critical for core app functionality. "
-        "VALIDATION REQUIREMENT: For each prompt, include a 'validation_criteria' field that specifies exactly what to check to verify the step was completed successfully. "
-        "Validation criteria should include: file existence checks, class/method presence, specific content patterns, and functional requirements."
+        "You are a senior Flutter iOS lead. Generate EXTREMELY DETAILED, PRODUCTION-READY app specifications. "
+        "Return ONLY valid JSON - no markdown, no code fences, no explanations. "
+        "Each prompt must specify exact file paths, class names, method signatures, UI components, colors, spacing. "
+        "Focus on working localization, NO fake data, Material Design 3.0, RTL support. "
+        "Include 'validation_criteria' field for each prompt with file existence checks, class/method presence, content patterns. "
+        "Generate 12-15 detailed prompts that create a fully functional app."
     )
 
     # App spec scaffold we want the model to follow - MUCH MORE DETAILED like human prompts
@@ -487,10 +479,15 @@ Return JSON EXACTLY with keys:
     obj = None
     while attempts < 3:
         attempts += 1
-        body = {"model": model, "messages": [
-            {"role": "system", "content": system_msg},
-            {"role": "user", "content": user_msg}
-        ]}
+        body = {
+            "model": model, 
+            "messages": [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg}
+            ],
+            "max_tokens": 8000,  # Increase token limit to prevent truncation
+            "temperature": 0.7   # Add temperature for better responses
+        }
         try:
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: Attempting API call {attempts}/3 with model: {model}", file=sys.stderr)
@@ -498,6 +495,12 @@ Return JSON EXACTLY with keys:
             raw_content = data["choices"][0]["message"]["content"]
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: API response length: {len(raw_content)}", file=sys.stderr)
+            
+            # Check if response was truncated
+            if raw_content.endswith('...') or not raw_content.strip().endswith('}'):
+                if os.environ.get('DEBUG_MODE') == '1':
+                    print(f"DEBUG: Response appears truncated (ends with: '{raw_content[-50:]}')", file=sys.stderr)
+                raise json.JSONDecodeError("Response truncated", raw_content, len(raw_content))
             
             # Try to parse the JSON with cleaning
             content = clean_json_response(raw_content)
