@@ -48,12 +48,16 @@ stage('Generate idea + prompts (ChatGPT or DeepSeek)') {
     withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
       sh '''
         set -euo pipefail
-        python3 "${WORKSPACE}/Python/generate_app_spec.py"
-        echo "------ app_spec.json ------"; cat out/app_spec.json || true; echo "---------------------------"
+        python3 "${WORKSPACE}/Python/generate_prompts.py"
+        echo '------ app_spec.json ------'
+        cat out/app_spec.json || true
+        echo '---------------------------'
       '''
     }
   }
 }
+
+
 
 
 
@@ -63,51 +67,51 @@ stage('Create project under ~/AppMagician/<AppName>') {
     withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
       sh '''
         set -euo pipefail
-        APP_DIR="$(cat out/app_dir.txt)"
-        BUNDLE_ID="${BUNDLE_ID:-com.example.myapp}"
-        APP_ORG="${BUNDLE_ID%.*}"   # com.example.myapp -> com.example
-        APP_ROOT="${APP_ROOT:-${HOME}/AppMagician}"
+        APP_JSON="$WORKSPACE/out/app_spec.json"
+        RAW_NAME="$(jq -r '.app_name // empty' "$APP_JSON" 2>/dev/null || true)"
+        [ -z "$RAW_NAME" ] && RAW_NAME="$(cat "$WORKSPACE/out/app_dir.txt" 2>/dev/null || true)"
+        RAW_NAME="${RAW_NAME:-$APP_DIR}"
+
+        # sanitize to valid Dart package
+        SANITIZED="$(printf '%s' "$RAW_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_]+/_/g; s/^_+//; s/_+$//')"
+        case "$SANITIZED" in
+          [a-z]* ) ;;
+          * ) SANITIZED="app_${SANITIZED}";;
+        esac
+        SANITIZED="${SANITIZED:-app_generated}"
+        echo "$SANITIZED" > "$WORKSPACE/out/app_dir.txt"
+
+        APP_DIR="$SANITIZED"
+        BUNDLE_ID="${BUNDLE_ID:-com.example.generated}"
+        APP_ORG="$(printf '%s' "$BUNDLE_ID" | sed -E 's/\\.[^.]+$//')"
+        APP_ROOT="${APP_ROOT:-$HOME/AppMagician}"
 
         mkdir -p "${APP_ROOT}"
         cd "${APP_ROOT}"
-
         if [ ! -d "${APP_DIR}" ]; then
-          # Use --org to get close, but we’ll still enforce exact bundle id below
-          flutter create --platforms=ios --org "${APP_ORG}" "${APP_DIR}"
+          flutter create --platforms=ios --org "$APP_ORG" "${APP_DIR}"
         fi
 
         cd "${APP_DIR}"
-
-        # Enforce PRODUCT_BUNDLE_IDENTIFIER in all build configs
         PBX="ios/Runner.xcodeproj/project.pbxproj"
         if [ -f "$PBX" ]; then
-          if [ "$(uname)" = "Darwin" ]; then SED=(-i ''); else SED=(-i); fi
-          sed "${SED[@]}" -E "s/(PRODUCT_BUNDLE_IDENTIFIER = )[^;]+;/\\1${BUNDLE_ID};/g" "$PBX"
+          if [ "$(uname)" = "Darwin" ]; then SED=( -i '' ); else SED=( -i ); fi
+          sed "${SED[@]}" -E "s/(PRODUCT_BUNDLE_IDENTIFIER = )[^;]+;/\\1${BUNDLE_ID};/g" "$PBX" || true
           echo "✅ Set PRODUCT_BUNDLE_IDENTIFIER=${BUNDLE_ID}"
         fi
 
-        # Ensure Info.plist uses the build setting (don’t hardcode)
-        PLIST="ios/Runner/Info.plist"
-        if [ -f "$PLIST" ]; then
-          # If CFBundleIdentifier is NOT using $(PRODUCT_BUNDLE_IDENTIFIER), switch it to the macro
-          if ! /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST" 2>/dev/null | grep -q 'PRODUCT_BUNDLE_IDENTIFIER'; then
-            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier \$(PRODUCT_BUNDLE_IDENTIFIER)" "$PLIST" || true
-            echo "🔧 Normalized CFBundleIdentifier to $(PRODUCT_BUNDLE_IDENTIFIER)"
-          fi
-        fi
-
-        # Agent notes (no hardcoding of strings or locales here)
+        # helpful guide for Cursor
         cat > AGENTS.md << 'MD'
-- iOS focus; keep code in lib/features/*
-- Use runtime-provided API base URL / key (no secrets)
-- Keep `flutter analyze` clean; add 1 minimal unit test
-- If localization is requested via params, generate only those locales
-- Do NOT change the iOS bundle id set by CI
+- Edit in-place only (no project creation).
+- Use lib/features/** structure.
+- Honor the app idea from the hint.
+- Keep flutter analyze and tests passing.
 MD
       '''
     }
   }
 }
+
 
 
 stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTINEL)') {
@@ -198,29 +202,7 @@ DART
           [ -f .an.out ]   && tail -n 200 .an.out  | sed 's/"/\\"/g' > .an.tail || true
           [ -f .test.out ] && tail -n 200 .test.out| sed 's/"/\\"/g' > .ts.tail || true
 
-          # Create fix prompt file
-          cat > .fix_prompt.txt << 'FIXPROMPT'
-You are a senior Flutter engineer. The previous step (${STEP}) introduced issues.
-Fix the codebase while preserving the intended feature.
-
-Requirements:
-- Do NOT add or nest a Flutter project. Edit the existing project in-place.
-- If pubspec.yaml changed, update code/imports accordingly.
-- Make 'flutter analyze' pass.
-- Make tests pass (add/update minimal tests if needed).
-- Keep architecture under lib/features/** tidy.
-
-When done, print EXACTLY:
-~~CURSOR_DONE~~
-
-Error snippets:
-[analyze]
-FIXPROMPT
-          cat .an.tail >> .fix_prompt.txt
-          echo -e "\n[tests]\n" >> .fix_prompt.txt
-          cat .ts.tail >> .fix_prompt.txt
-          
-          python3 "${WORKSPACE}/Python/cursor_fix_runner.py" .fix_prompt.txt
+          python3 "${WORKSPACE}/Python/cursor_fix.py"
           flutter pub get >/dev/null 2>&1 || true
         }
 
@@ -234,7 +216,7 @@ FIXPROMPT
         }
 
         run_cursor() {
-          python3 "${WORKSPACE}/Python/cursor_fix_runner.py" .prompt.txt
+          python3 "${WORKSPACE}/Python/cursor_run.py"
         }
 
         i=0
@@ -369,7 +351,7 @@ PROMPT
   } > .prompt.txt
 
   # Send to Cursor and require the sentinel
-  python3 "${WORKSPACE}/Python/cursor_generic_fix.py" .prompt.txt
+  python3 "${WORKSPACE}/Python/build_fix.py"
 
   # Refresh deps after edits
   flutter pub get >/dev/null 2>&1 || true
