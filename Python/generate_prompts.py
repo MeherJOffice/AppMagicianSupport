@@ -165,7 +165,7 @@ def main():
         if not isinstance(prompts, list) or not prompts:
             return False, ["prompts_missing"]
         problems = []
-        if not (8 <= len(prompts) <= 15):  # More flexible range - allow 8-15 prompts
+        if not (12 <= len(prompts) <= 15):  # Updated range for extremely detailed prompts
             problems.append(f"count:{len(prompts)}")
         
         # Check total length of all prompts (should be reasonable but detailed)
@@ -229,7 +229,6 @@ def main():
         "Focus on POLISHED, MODERN UI/UX with working localization and NO fake data. "
         "CRITICAL JSON FORMATTING: Return ONLY valid JSON. No markdown, no code fences, no explanations outside the JSON. "
         "The JSON must be properly formatted with correct quotes, commas, and brackets. "
-        "PROMPT COUNT: Generate exactly 8-15 detailed prompts. Each prompt should be comprehensive and specific. "
         "Do NOT suggest creating projects. "
         "Every step must edit explicit files under pubspec.yaml, analysis_options.yaml, lib/**, test/**, or ios/** (safe files only). "
         "CRITICAL: Each prompt must specify exact file paths, class names, method signatures, UI components, colors, spacing, and complete implementation details. "
@@ -450,7 +449,7 @@ CRITICAL REQUIREMENTS - BE EXTREMELY DETAILED:
 EXAMPLE OF DETAILED PROMPT:
 "Create lib/features/reminder/presentation/screens/reminder_screen.dart: Build a complete reminder screen with FloatingActionButton for adding reminders, ListView.builder for displaying reminders with CheckboxListTile, proper Material 3.0 styling with primary color #2196F3, spacing of 16px between items, and RTL support. Include empty state with Icon(Icons.alarm_off) and Text('No reminders yet'). Handle loading states with CircularProgressIndicator and errors with SnackBar."
 
-Generate 8-15 EXTREMELY DETAILED prompts that create a fully functional, polished app with working localization, no fake data, and production-ready features.
+Generate 12-15 EXTREMELY DETAILED prompts that create a fully functional, polished app with working localization, no fake data, and production-ready features.
 
 Return JSON EXACTLY with keys:
 {{
