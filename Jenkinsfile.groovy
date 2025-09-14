@@ -427,7 +427,7 @@ DART
               echo "⏳ Validating core widgets..."
               if [ -f "lib/core/presentation/widgets/loading_widget.dart" ]; then
                 echo "✅ LoadingWidget file exists"
-                if grep -q "CircularProgressIndicator\|LoadingWidget" "lib/core/presentation/widgets/loading_widget.dart"; then
+                if grep -q "CircularProgressIndicator\\|LoadingWidget" "lib/core/presentation/widgets/loading_widget.dart"; then
                   echo "✅ Loading indicator found"
                 else
                   echo "❌ Loading indicator not found"
@@ -441,7 +441,7 @@ DART
             10)
               # After RTL support
               echo "🔄 Validating RTL support..."
-              if grep -q "TextDirection\|RTL\|LTR" "lib/main.dart"; then
+              if grep -q "TextDirection\\|RTL\\|LTR" "lib/main.dart"; then
                 echo "✅ RTL support found in main.dart"
               else
                 echo "❌ RTL support not found in main.dart"
@@ -453,7 +453,7 @@ DART
               echo "📦 Validating dependencies..."
               if [ -f "pubspec.yaml" ]; then
                 echo "✅ pubspec.yaml exists"
-                if grep -q "provider\|riverpod\|shared_preferences\|flutter_localizations" "pubspec.yaml"; then
+                if grep -q "provider\\|riverpod\\|shared_preferences\\|flutter_localizations" "pubspec.yaml"; then
                   echo "✅ Required dependencies found"
                 else
                   echo "❌ Required dependencies not found"
