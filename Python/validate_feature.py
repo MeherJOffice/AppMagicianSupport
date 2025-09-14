@@ -349,8 +349,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 EXAMPLES:
-    # Validate expenses feature
-    python3 Python/validate_feature.py expenses
+    # Validate main feature
+    python3 Python/validate_feature.py main_feature
     
     # Validate savings feature with custom app path
     APP_ROOT=/path/to/app python3 Python/validate_feature.py savings
@@ -375,7 +375,7 @@ EXIT CODES:
     
     parser.add_argument(
         'feature_name',
-        help='Name of the feature to validate (e.g., "expenses", "savings", "settings")'
+        help='Name of the feature to validate (e.g., "main_feature", "savings", "settings")'
     )
     
     parser.add_argument(
@@ -386,7 +386,7 @@ EXIT CODES:
     args = parser.parse_args()
     
     # Get app directory from environment or use default
-    app_dir = os.environ.get('APP_DIR', 'test_todo_app')
+    app_dir = os.environ.get('APP_DIR', 'generated_app')
     if args.app_root:
         app_root = args.app_root
     else:

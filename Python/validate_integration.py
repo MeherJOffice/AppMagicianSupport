@@ -325,7 +325,7 @@ OPTIONS:
     -h, --help          Show this help message
 
 ENVIRONMENT VARIABLES:
-    APP_DIR             App directory name (default: 'test_todo_app')
+    APP_DIR             App directory name (default: 'generated_app')
     APP_ROOT            Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 
 VALIDATION CHECKS:
@@ -354,7 +354,7 @@ EXAMPLES:
         sys.exit(0)
     
     # Get app directory from environment or use default
-    app_dir = os.environ.get('APP_DIR', 'test_todo_app')
+    app_dir = os.environ.get('APP_DIR', 'generated_app')
     app_root = os.environ.get('APP_ROOT', f"{os.environ.get('HOME', '/tmp')}/AppMagician/{app_dir}")
     
     print(f"🔍 Validating integration for app: {app_dir}")

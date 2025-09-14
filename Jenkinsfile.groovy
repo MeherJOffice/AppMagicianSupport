@@ -322,24 +322,50 @@ DART
               fi
               ;;
             4)
-              # After ExpensesScreen creation
-              echo "💰 Validating expenses feature integration..."
-              python3 "${WORKSPACE}/Python/validate_feature.py" expenses || return 1
+              # After main feature screen creation - dynamic validation
+              echo "🎯 Validating main feature integration..."
+              # Find the main feature by looking at the prompt content
+              if echo "$STEP_CONTENT" | grep -qi "expenses"; then
+                echo "💰 Validating expenses feature integration..."
+                python3 "${WORKSPACE}/Python/validate_feature.py" expenses || return 1
+              elif echo "$STEP_CONTENT" | grep -qi "todo"; then
+                echo "📝 Validating todo feature integration..."
+                python3 "${WORKSPACE}/Python/validate_feature.py" todo || return 1
+              elif echo "$STEP_CONTENT" | grep -qi "notes"; then
+                echo "📝 Validating notes feature integration..."
+                python3 "${WORKSPACE}/Python/validate_feature.py" notes || return 1
+              else
+                echo "ℹ️  Generic feature validation - checking for feature screens..."
+                # Generic validation - check if any feature screens exist
+                if find lib/features -name "*_screen.dart" | grep -v home | head -1; then
+                  echo "✅ Feature screens found"
+                else
+                  echo "❌ No feature screens found"
+                  return 1
+                fi
+              fi
               ;;
             5)
-              # After AddExpenseScreen creation
-              echo "➕ Validating expense forms..."
-              if [ -f "lib/features/expenses/presentation/screens/add_expense_screen.dart" ]; then
-                echo "✅ AddExpenseScreen file exists"
-                if grep -q "Form\|TextFormField\|ElevatedButton" "lib/features/expenses/presentation/screens/add_expense_screen.dart"; then
+              # After form screen creation - dynamic validation
+              echo "➕ Validating form elements..."
+              # Find form screens dynamically
+              FORM_SCREEN=$(find lib/features -name "*form*screen.dart" -o -name "*add*screen.dart" -o -name "*create*screen.dart" | head -1)
+              if [ -n "$FORM_SCREEN" ]; then
+                echo "✅ Form screen found: $FORM_SCREEN"
+                if grep -q "Form\\|TextFormField\\|ElevatedButton\\|TextField" "$FORM_SCREEN"; then
                   echo "✅ Form elements found"
                 else
                   echo "❌ Form elements not found"
                   return 1
                 fi
               else
-                echo "❌ AddExpenseScreen file not found"
-                return 1
+                echo "ℹ️  No specific form screen found - checking for general form elements..."
+                if find lib/features -name "*screen.dart" -exec grep -l "Form\\|TextFormField\\|ElevatedButton\\|TextField" {} \; | head -1; then
+                  echo "✅ Form elements found in screens"
+                else
+                  echo "❌ No form elements found"
+                  return 1
+                fi
               fi
               ;;
             6)
@@ -359,14 +385,42 @@ DART
               fi
               ;;
             7)
-              # After SavingsScreen creation
-              echo "💾 Validating savings feature integration..."
-              python3 "${WORKSPACE}/Python/validate_feature.py" savings || return 1
+              # After secondary feature creation - dynamic validation
+              echo "🎯 Validating secondary feature integration..."
+              # Find secondary features by looking at the prompt content
+              if echo "$STEP_CONTENT" | grep -qi "savings"; then
+                echo "💾 Validating savings feature integration..."
+                python3 "${WORKSPACE}/Python/validate_feature.py" savings || return 1
+              elif echo "$STEP_CONTENT" | grep -qi "settings"; then
+                echo "⚙️  Validating settings feature integration..."
+                python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+              else
+                echo "ℹ️  Generic secondary feature validation..."
+                # Check for any additional feature screens
+                FEATURE_COUNT=$(find lib/features -name "*_screen.dart" | grep -v home | wc -l)
+                if [ "$FEATURE_COUNT" -ge 2 ]; then
+                  echo "✅ Multiple feature screens found ($FEATURE_COUNT)"
+                else
+                  echo "❌ Insufficient feature screens found ($FEATURE_COUNT)"
+                  return 1
+                fi
+              fi
               ;;
             8)
-              # After SettingsScreen creation
+              # After SettingsScreen creation - dynamic validation
               echo "⚙️  Validating settings feature integration..."
-              python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+              if [ -f "lib/features/settings/presentation/screens/settings_screen.dart" ]; then
+                echo "✅ Settings screen found"
+                python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+              else
+                echo "ℹ️  No settings screen found - checking for general settings elements..."
+                if find lib/features -name "*screen.dart" -exec grep -l "settings\\|Settings" {} \; | head -1; then
+                  echo "✅ Settings elements found"
+                else
+                  echo "❌ No settings elements found"
+                  return 1
+                fi
+              fi
               ;;
             9)
               # After LoadingIndicator

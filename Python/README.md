@@ -47,7 +47,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
 - **Purpose**: Validates that all features are properly integrated in the Flutter app
 - **Usage**: Called from Jenkins pipeline to check app integration
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Validation Checks**:
   - App structure and required directories
@@ -68,7 +68,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `feature_name`: Name of the feature to validate (required)
   - `--app-root`: Path to app root directory (optional)
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Validation Checks**:
   - Feature directory exists in `lib/features/{feature}/`
@@ -83,7 +83,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `1`: Validation failures found
 - **Examples**:
   ```bash
-  python3 Python/validate_feature.py expenses
+  python3 Python/validate_feature.py main_feature
   python3 Python/validate_feature.py savings --app-root /path/to/app
   ```
 
@@ -95,7 +95,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `--verbose`: Enable verbose output (optional)
   - `--dry-run`: Show what would be removed without actually removing files (optional)
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Cleanup Actions**:
   - Remove placeholder screens from home feature
@@ -128,7 +128,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `--min-coverage`: Minimum test coverage percentage (default: 70.0)
   - `--json-output`: Output results to JSON file (optional)
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Quality Checks**:
   - Flutter analyze (errors only, not warnings)
@@ -156,7 +156,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `--app-root`: Path to app root directory (optional)
   - `--verbose`: Enable verbose output (optional)
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Navigation Validation Checks**:
   - HomeScreen navigation structure (not IndexedStack)
@@ -185,7 +185,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `--skip-ios`: Skip iOS build verification (optional)
   - `--skip-tests`: Skip test execution (optional)
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Build Verification Checks**:
   - Flutter clean (clean build environment)
@@ -214,7 +214,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `--rollback-on-failure`: Rollback changes if recovery fails (optional)
   - `--verbose`: Enable verbose output (optional)
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Error Detection & Recovery**:
   - Detect common error patterns (missing imports, provider issues, navigation problems)
@@ -246,7 +246,7 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `--history`: Load metrics history for N days (default: 30)
   - `--init-db`: Initialize database only
 - **Environment Variables**:
-  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_DIR`: App directory name (default: 'generated_app')
   - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
 - **Pipeline Monitoring Features**:
   - Track success/failure rates of each pipeline step

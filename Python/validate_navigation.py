@@ -592,7 +592,7 @@ EXIT CODES:
     args = parser.parse_args()
     
     # Get app directory from environment or use default
-    app_dir = os.environ.get('APP_DIR', 'test_todo_app')
+    app_dir = os.environ.get('APP_DIR', 'generated_app')
     if args.app_root:
         app_root = args.app_root
     else:

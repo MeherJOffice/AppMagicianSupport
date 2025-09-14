@@ -45,22 +45,22 @@ def main():
         if os.environ.get('TEST_MODE') == '1':
             print("TEST_MODE enabled - generating mock response", file=sys.stderr)
             obj = {
-                "app_name": "test_todo_app",
+                "app_name": "generated_app",
                 "spec": {"theme": "light", "locale": locales[0], "platforms": ["ios"], "features": ["utility"]},
                 "cursor_prompts": [
                     "Edit pubspec.yaml: add dependencies for state management and UI components.",
                     "Create lib/main.dart: set up MaterialApp with theme and routing.",
-                    "Create lib/features/todo/todo_model.dart: define Todo data model.",
-                    "Create lib/features/todo/todo_service.dart: implement CRUD operations.",
-                    "Create lib/features/todo/todo_list_widget.dart: display list of todos.",
-                    "Create lib/features/todo/todo_form_widget.dart: add/edit todo form.",
-                    "Write test/features/todo/todo_service_test.dart: unit tests for service.",
-                    "Write test/features/todo/todo_widget_test.dart: widget tests for UI."
+                    "Create lib/features/main/main_model.dart: define main data model.",
+                    "Create lib/features/main/main_service.dart: implement CRUD operations.",
+                    "Create lib/features/main/main_list_widget.dart: display list of items.",
+                    "Create lib/features/main/main_form_widget.dart: add/edit item form.",
+                    "Write test/features/main/main_service_test.dart: unit tests for service.",
+                    "Write test/features/main/main_widget_test.dart: widget tests for UI."
                 ],
                 "meta": {
                     "requested_locales": locales,
                     "bundle_id_hint": bundle_id,
-                    "feature_summary": prompt_hint or "Implement todo app feature."
+                    "feature_summary": prompt_hint or "Implement app feature."
                 }
             }
             os.makedirs("out", exist_ok=True)
@@ -212,7 +212,7 @@ Create a **PRODUCTION-READY iOS Flutter app** based on this idea:
 CRITICAL REQUIREMENTS - BE EXTREMELY DETAILED:
 
 1. **REMOVE ALL FAKE/PLACEHOLDER DATA**: 
-   - Delete all counter app code, fake todos, sample data, placeholder text
+   - Delete all counter app code, fake data, sample data, placeholder text
    - Replace with real, functional features that match the app idea
    - No "Lorem ipsum", "Sample text", or demo content
 
