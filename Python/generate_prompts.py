@@ -195,13 +195,41 @@ def main():
         text = re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=re.I)
         text = re.sub(r'```\s*$', '', text, flags=re.I)
         return text.strip()
+    
+    def clean_json_response(text: str) -> str:
+        """Clean and fix common JSON issues in LLM responses"""
+        # Remove any markdown formatting
+        text = re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=re.I)
+        text = re.sub(r'```\s*$', '', text, flags=re.I)
+        
+        # Find the JSON object boundaries
+        start = text.find('{')
+        end = text.rfind('}')
+        
+        if start == -1 or end == -1 or end <= start:
+            return text.strip()
+        
+        # Extract just the JSON part
+        json_text = text[start:end+1]
+        
+        # Fix common JSON issues
+        # Remove trailing commas before closing braces/brackets
+        json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)
+        
+        # Fix unescaped quotes in strings (basic fix)
+        # This is a simple approach - more complex cases might need better handling
+        json_text = re.sub(r'(?<!\\)"(?![,}\]]|\s*:)', r'\\"', json_text)
+        
+        return json_text.strip()
 
     system_msg = (
         "You are a senior Flutter iOS lead working INSIDE an existing repo. "
         "Your task is to generate EXTREMELY DETAILED, PRODUCTION-READY app specifications. "
         "Each prompt must be as detailed as a human would ask ChatGPT for Cursor prompts. "
         "Focus on POLISHED, MODERN UI/UX with working localization and NO fake data. "
-        "Return STRICT JSON only. Do NOT suggest creating projects. "
+        "CRITICAL JSON FORMATTING: Return ONLY valid JSON. No markdown, no code fences, no explanations outside the JSON. "
+        "The JSON must be properly formatted with correct quotes, commas, and brackets. "
+        "Do NOT suggest creating projects. "
         "Every step must edit explicit files under pubspec.yaml, analysis_options.yaml, lib/**, test/**, or ios/** (safe files only). "
         "CRITICAL: Each prompt must specify exact file paths, class names, method signatures, UI components, colors, spacing, and complete implementation details. "
         "MANDATORY: Remove all fake/placeholder data, create working localization with settings screen, implement fully functional features. "
@@ -467,21 +495,39 @@ Return JSON EXACTLY with keys:
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: Attempting API call {attempts}/3 with model: {model}", file=sys.stderr)
             data = call_api(body)
-            content = strip_code_fences(data["choices"][0]["message"]["content"])
+            raw_content = data["choices"][0]["message"]["content"]
             if os.environ.get('DEBUG_MODE') == '1':
-                print(f"DEBUG: API response length: {len(content)}", file=sys.stderr)
+                print(f"DEBUG: API response length: {len(raw_content)}", file=sys.stderr)
+            
+            # Try to parse the JSON with cleaning
+            content = clean_json_response(raw_content)
+            if os.environ.get('DEBUG_MODE') == '1':
+                print(f"DEBUG: Cleaned content length: {len(content)}", file=sys.stderr)
+                print(f"DEBUG: Content preview: {content[:200]}...", file=sys.stderr)
+            
             obj = json.loads(content)
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: Parsed JSON successfully", file=sys.stderr)
         except json.JSONDecodeError as e:
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: JSON decode error: {e}", file=sys.stderr)
-                print(f"DEBUG: Content preview: {content[:200]}...", file=sys.stderr)
+                print(f"DEBUG: Raw content preview: {raw_content[:300]}...", file=sys.stderr)
+                print(f"DEBUG: Cleaned content preview: {content[:300]}...", file=sys.stderr)
+                print(f"DEBUG: Error position: {e.pos if hasattr(e, 'pos') else 'unknown'}", file=sys.stderr)
+            
+            # Try to fallback to a simpler model if available
             if provider == 'chatgpt' and model not in ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo']:
                 model = 'gpt-4o-mini'
                 continue
+            
+            # If this is the last attempt, try to extract what we can
+            if attempts == 3:
+                print("LLM response was not valid JSON after all attempts:", e, file=sys.stderr)
+                print("Raw response preview:", raw_content[:500], file=sys.stderr)
+                sys.exit(1)
+            
             print("LLM response was not valid JSON:", e, file=sys.stderr)
-            sys.exit(1)
+            continue
         except Exception as e:
             if os.environ.get('DEBUG_MODE') == '1':
                 print(f"DEBUG: API call failed: {e}", file=sys.stderr)
