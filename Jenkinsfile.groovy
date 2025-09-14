@@ -46,6 +46,16 @@ pipeline {
             set -euo pipefail
             echo "Workspace: $WORKSPACE"
             echo "PATH: $PATH"
+            
+            # Check for timeout command availability
+            if command -v gtimeout >/dev/null 2>&1; then
+              echo "✅ gtimeout available (from coreutils)"
+            elif command -v timeout >/dev/null 2>&1; then
+              echo "✅ timeout available"
+            else
+              echo "⚠️  No timeout command available - consider installing coreutils: brew install coreutils"
+            fi
+            
             [ "$(uname)" = "Darwin" ] || { echo "Must run on macOS"; exit 1; }
             which flutter       || { echo "❌ flutter not found"; exit 1; }
             which cursor-agent  || { echo "❌ cursor-agent not found"; exit 1; }
@@ -148,7 +158,7 @@ MD
 
 
     stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTINEL)') {
-      options { timeout(time: 30, unit: 'MINUTES') }
+      options { timeout(time: 20, unit: 'MINUTES') }
       steps {
         withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin", "CURSOR_CI=1"]) {
           sh '''
@@ -282,12 +292,32 @@ DART
           [ -f .an.out ]   && tail -n 200 .an.out  | sed 's/"/\\"/g' > .an.tail || true
           [ -f .test.out ] && tail -n 200 .test.out| sed 's/"/\\"/g' > .ts.tail || true
 
-          # Add timeout for auto-fix attempts
-          timeout 180 python3 "${WORKSPACE}/Python/cursor_fix.py" || {
-            echo "⚠️  Auto-fix attempt timed out after 3 minutes"
-            echo "🔄 Continuing to next attempt..."
-            return 1
-          }
+          # Use gtimeout with retry logic for auto-fix
+          if command -v gtimeout >/dev/null 2>&1; then
+            echo "🔄 Running auto-fix with gtimeout (3 min limit)..."
+            # Kill any existing cursor processes first
+            pkill -f "cursor-agent" 2>/dev/null || true
+            sleep 2
+            
+            if gtimeout --kill-after=5s 180 python3 "${WORKSPACE}/Python/cursor_fix.py"; then
+              echo "✅ Auto-fix completed successfully"
+              return 0
+            else
+              echo "⚠️  Auto-fix attempt timed out after 3 minutes"
+              echo "🔄 Killing any remaining cursor processes..."
+              pkill -f "cursor-agent" 2>/dev/null || true
+              sleep 2
+              echo "🔄 Continuing to next attempt..."
+              return 1
+            fi
+          else
+            echo "⚠️  timeout command not available - running without timeout protection"
+            python3 "${WORKSPACE}/Python/cursor_fix.py" || {
+              echo "⚠️  Auto-fix attempt failed"
+              echo "🔄 Continuing to next attempt..."
+              return 1
+            }
+          fi
           
           # Only run flutter pub get if pubspec.yaml might have changed during fix
           old_hash="$( [ -f .pubspec.hash ] && cat .pubspec.hash || echo none )"
@@ -309,12 +339,50 @@ DART
         }
 
         run_cursor() {
-          # Add timeout for individual step execution
-          timeout 300 python3 "${WORKSPACE}/Python/cursor_run.py" || {
-            echo "⚠️  Step execution timed out after 5 minutes"
-            echo "🔄 Continuing to next step..."
-            return 0
-          }
+          local MAX_RETRIES=2
+          local RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            
+            if [ $RETRY_COUNT -gt 1 ]; then
+              echo "🔄 Retry attempt $RETRY_COUNT/$MAX_RETRIES for cursor execution..."
+              echo "⏳ Waiting 10 seconds before retry..."
+              sleep 10
+            fi
+            
+            # Use gtimeout with proper signal handling for macOS
+            if command -v gtimeout >/dev/null 2>&1; then
+              echo "🔄 Running cursor with gtimeout (5 min limit) - attempt $RETRY_COUNT..."
+              # Kill any existing cursor processes first
+              pkill -f "cursor-agent" 2>/dev/null || true
+              sleep 2
+              
+              if gtimeout --kill-after=10s 300 python3 "${WORKSPACE}/Python/cursor_run.py"; then
+                echo "✅ Cursor execution completed successfully on attempt $RETRY_COUNT"
+                return 0
+              else
+                echo "⚠️  Cursor execution failed/timed out on attempt $RETRY_COUNT"
+                echo "🔄 Killing any remaining cursor processes..."
+                pkill -f "cursor-agent" 2>/dev/null || true
+                sleep 2
+                
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "🔄 Will retry cursor execution..."
+                else
+                  echo "❌ Max retries reached - continuing to next step"
+                  return 0
+                fi
+              fi
+            else
+              echo "⚠️  timeout command not available - running without timeout protection"
+              python3 "${WORKSPACE}/Python/cursor_run.py" || {
+                echo "⚠️  Step execution failed"
+                echo "🔄 Continuing to next step..."
+                return 0
+              }
+            fi
+          done
         }
 
         # Validation functions for each step
@@ -523,12 +591,31 @@ DART
           # Record step start time for monitoring
           STEP_START_TIME=$(date +%s)
           
-          # Execute step with timeout protection - always continue
-          if run_cursor; then
-            echo "✅ Step ${STEP_NO} completed successfully"
-          else
-            echo "⚠️  Step ${STEP_NO} failed or timed out - continuing to next step"
-          fi
+          # Execute step with retry logic - always continue
+          STEP_RETRY_COUNT=0
+          STEP_MAX_RETRIES=1
+          
+          while [ $STEP_RETRY_COUNT -le $STEP_MAX_RETRIES ]; do
+            if [ $STEP_RETRY_COUNT -gt 0 ]; then
+              echo "🔄 Retrying step ${STEP_NO} (attempt $((STEP_RETRY_COUNT + 1))/$((STEP_MAX_RETRIES + 1)))..."
+              echo "⏳ Waiting 15 seconds before retry..."
+              sleep 15
+            fi
+            
+            if run_cursor; then
+              echo "✅ Step ${STEP_NO} completed successfully on attempt $((STEP_RETRY_COUNT + 1))"
+              break
+            else
+              echo "⚠️  Step ${STEP_NO} failed or timed out on attempt $((STEP_RETRY_COUNT + 1))"
+              if [ $STEP_RETRY_COUNT -lt $STEP_MAX_RETRIES ]; then
+                echo "🔄 Will retry step ${STEP_NO}..."
+              else
+                echo "❌ Max retries reached for step ${STEP_NO} - continuing to next step"
+              fi
+            fi
+            
+            STEP_RETRY_COUNT=$((STEP_RETRY_COUNT + 1))
+          done
           flatten_if_nested
 
           # Always run checks but don't fail the pipeline
@@ -775,12 +862,32 @@ PROMPT
     printf "\\n[ANALYZE TAIL]\\n%s\\n\\n[TEST TAIL]\\n%s\\n\\n[BUILD TAIL]\\n%s\\n" "$AN_TAIL" "$TS_TAIL" "$BD_TAIL"
   } > .prompt.txt
 
-  # Send to Cursor and require the sentinel with timeout
-  timeout 300 python3 "${WORKSPACE}/Python/build_fix.py" || {
-    echo "⚠️  Build fix attempt timed out after 5 minutes"
-    echo "🔄 Continuing to next attempt..."
-    return 1
-  }
+  # Use gtimeout with retry logic for build fix
+  if command -v gtimeout >/dev/null 2>&1; then
+    echo "🔄 Running build fix with gtimeout (5 min limit)..."
+    # Kill any existing cursor processes first
+    pkill -f "cursor-agent" 2>/dev/null || true
+    sleep 2
+    
+    if gtimeout --kill-after=10s 300 python3 "${WORKSPACE}/Python/build_fix.py"; then
+      echo "✅ Build fix completed successfully"
+      return 0
+    else
+      echo "⚠️  Build fix attempt timed out after 5 minutes"
+      echo "🔄 Killing any remaining cursor processes..."
+      pkill -f "cursor-agent" 2>/dev/null || true
+      sleep 2
+      echo "🔄 Continuing to next attempt..."
+      return 1
+    fi
+  else
+    echo "⚠️  timeout command not available - running without timeout protection"
+    python3 "${WORKSPACE}/Python/build_fix.py" || {
+      echo "⚠️  Build fix attempt failed"
+      echo "🔄 Continuing to next attempt..."
+      return 1
+    }
+  fi
 
   # Refresh deps after edits - only if pubspec.yaml changed
   old_hash="$( [ -f .pubspec.hash ] && cat .pubspec.hash || echo none )"
