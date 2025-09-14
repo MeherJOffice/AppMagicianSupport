@@ -786,12 +786,6 @@ if [ "${ENABLE_PIPELINE_MONITORING}" = "1" ]; then
 fi
 '''
     }
-  }
-}
-
-
-
-  }
 
   stage('Pipeline Health Monitoring & Reporting') {
     when {
@@ -799,7 +793,7 @@ fi
     }
     steps {
       withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
-        sh '''
+        sh ''
           set -euo pipefail
           APP_DIR="$(cat out/app_dir.txt)"
           cd "${APP_ROOT}/${APP_DIR}"
@@ -808,15 +802,15 @@ fi
           echo "=============================================="
           
           # Collect current metrics and save to database
-          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --collect-metrics \
-            --app-root "${APP_ROOT}/${APP_DIR}" \
-            --pipeline-id "${PIPELINE_ID}" \
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --collect-metrics 
+            --app-root "${APP_ROOT}/${APP_DIR}" 
+            --pipeline-id "${PIPELINE_ID}" 
             --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           
           # Generate health report if requested
           if [ "${GENERATE_PIPELINE_REPORT}" = "1" ]; then
             echo "📋 Generating comprehensive pipeline health report..."
-            python3 "${WORKSPACE}/Python/pipeline_monitor.py" --report \
+            python3 "${WORKSPACE}/Python/pipeline_monitor.py" --report 
               --db-path "${WORKSPACE}/pipeline_metrics.db" > "${WORKSPACE}/pipeline_health_report.txt" || true
             
             echo "📊 Pipeline Health Report:"
@@ -828,20 +822,20 @@ fi
           # Generate dashboard view
           echo "📈 Pipeline Dashboard:"
           echo "====================="
-          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --dashboard \
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --dashboard 
             --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           echo "====================="
           
           # Export metrics for historical analysis
           echo "💾 Exporting metrics for historical analysis..."
-          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --export json \
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --export json 
             --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           
           echo "✅ Pipeline monitoring completed"
-        '''
+        ''
       }
     }
-  }
+  }  }
 
   post {
     success {
