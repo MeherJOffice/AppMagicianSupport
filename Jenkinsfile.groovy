@@ -373,7 +373,7 @@ DART
               echo "🌍 Validating localization..."
               if [ -f "lib/l10n/app_en.arb" ] && [ -f "lib/l10n/app_ar.arb" ]; then
                 echo "✅ Localization files exist"
-                if grep -q "app_title\|settings\|language" "lib/l10n/app_en.arb"; then
+                if grep -q "app_title\\|settings\\|language" "lib/l10n/app_en.arb"; then
                   echo "✅ Localization keys found"
                 else
                   echo "❌ Localization keys not found"
