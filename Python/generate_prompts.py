@@ -120,18 +120,19 @@ def main():
 
     def concrete_enough(prompts):
         joined = "\n".join(prompts)
-        # More comprehensive quality checks
+        # More comprehensive quality checks (excluding widget tests for core functionality)
         has_dart_files = bool(re.search(r'\blib/[^\s]+\.dart\b', joined))
         has_tests = bool(re.search(r'\btest/[^\s]+_test\.dart\b', joined))
         has_localization = bool(re.search(r'\.arb\b|l10n|localization', joined, re.I))
         has_modern_ui = bool(re.search(r'material|theme|ui|widget', joined, re.I))
         has_architecture = bool(re.search(r'repository|entity|model|service', joined, re.I))
         
-        # Require at least 4 out of 5 quality indicators
-        quality_score = sum([has_dart_files, has_tests, has_localization, has_modern_ui, has_architecture])
+        # Focus on core functionality - tests are optional for initial app generation
+        # Require at least 3 out of 5 quality indicators (tests are now optional)
+        quality_score = sum([has_dart_files, has_localization, has_modern_ui, has_architecture])
         if os.environ.get('DEBUG_MODE') == '1':
-            print(f"DEBUG: Quality check - dart:{has_dart_files}, tests:{has_tests}, localization:{has_localization}, ui:{has_modern_ui}, arch:{has_architecture}, score:{quality_score}/5", file=sys.stderr)
-        return quality_score >= 4
+            print(f"DEBUG: Quality check - dart:{has_dart_files}, tests:{has_tests}, localization:{has_localization}, ui:{has_modern_ui}, arch:{has_architecture}, score:{quality_score}/4 (tests optional)", file=sys.stderr)
+        return quality_score >= 3
 
     def set_is_valid(prompts):
         if not isinstance(prompts, list) or not prompts:
@@ -168,7 +169,8 @@ def main():
         "Focus on POLISHED, MODERN UI/UX with proper localization support. "
         "Return STRICT JSON only. Do NOT suggest creating projects. "
         "Every step must edit explicit files under pubspec.yaml, analysis_options.yaml, lib/**, test/**, or ios/** (safe files only). "
-        "Prioritize: 1) Modern Material Design 3.0, 2) Proper RTL/LTR support, 3) Clean architecture, 4) Comprehensive testing, 5) Accessibility."
+        "Prioritize: 1) Modern Material Design 3.0, 2) Proper RTL/LTR support, 3) Clean architecture, 4) Core functionality, 5) Accessibility. "
+        "AVOID widget tests for initial app generation - focus on core features that make the app work."
     )
 
     # App spec scaffold we want the model to follow
@@ -183,7 +185,7 @@ def main():
             "Create lib/features/<feature>/presentation/widgets/<feature>_screen.dart: modern Material 3.0 UI with proper spacing, typography, and RTL layout.",
             "Create lib/features/<feature>/data/repositories/<feature>_repository.dart: clean data layer with proper error handling.",
             "Create lib/features/<feature>/domain/entities/<feature>_entity.dart: domain models with validation.",
-            "Write comprehensive tests: test/features/<feature>/presentation/widgets/<feature>_screen_test.dart with widget tests and accessibility tests.",
+            "Create lib/features/<feature>/presentation/providers/<feature>_provider.dart: state management with proper error handling and loading states.",
             "Update ios/Runner/Info.plist: configure proper app metadata, supported orientations, and accessibility settings."
         ],
         "meta": {
@@ -205,8 +207,9 @@ CRITICAL QUALITY REQUIREMENTS:
 - MANDATORY: Full localization support for {json.dumps(locales)} with proper RTL/LTR handling
 - MANDATORY: Modern Material Design 3.0 with proper spacing, typography, and animations
 - MANDATORY: Clean architecture (presentation/data/domain layers)
-- MANDATORY: Comprehensive testing (unit, widget, integration tests)
+- MANDATORY: Core functionality that makes the app work (business logic, data, UI)
 - MANDATORY: Accessibility support (semantics, screen readers)
+- AVOID: Widget tests for initial generation - focus on core features first
 - NO secrets/hardcoded values - use proper configuration patterns
 
 LOCALIZATION REQUIREMENTS:
