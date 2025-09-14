@@ -1,0 +1,31 @@
+{
+  "app_name": "test_todo_app",
+  "spec": {
+    "theme": "light",
+    "locale": "ar",
+    "platforms": [
+      "ios"
+    ],
+    "features": [
+      "utility"
+    ]
+  },
+  "cursor_prompts": [
+    "Edit pubspec.yaml: add dependencies for state management and UI components.",
+    "Create lib/main.dart: set up MaterialApp with theme and routing.",
+    "Create lib/features/todo/todo_model.dart: define Todo data model.",
+    "Create lib/features/todo/todo_service.dart: implement CRUD operations.",
+    "Create lib/features/todo/todo_list_widget.dart: display list of todos.",
+    "Create lib/features/todo/todo_form_widget.dart: add/edit todo form.",
+    "Write test/features/todo/todo_service_test.dart: unit tests for service.",
+    "Write test/features/todo/todo_widget_test.dart: widget tests for UI."
+  ],
+  "meta": {
+    "requested_locales": [
+      "ar",
+      "en"
+    ],
+    "bundle_id_hint": "com.test.app",
+    "feature_summary": "test app"
+  }
+}
