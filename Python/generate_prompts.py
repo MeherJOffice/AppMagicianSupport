@@ -88,6 +88,16 @@ def main():
     ]
 
     def prompt_is_valid(p):
+        # Handle both old string format and new object format
+        if isinstance(p, dict):
+            prompt_text = p.get("prompt", "")
+            validation_criteria = p.get("validation_criteria", {})
+            if not prompt_text or not prompt_text.strip():
+                return False, "empty_prompt"
+            if not validation_criteria:
+                return False, "missing_validation_criteria"
+            p = prompt_text  # Use the prompt text for further validation
+        
         if not isinstance(p, str) or not p.strip():
             return False, "empty"
         if len(p) > 8000:  # Increased to 8000 for extremely detailed, human-level prompts
@@ -109,7 +119,16 @@ def main():
     def prompts_cover_hint(prompts):
         if not HINT_KEYWORDS:
             return True
-        joined = " ".join(prompts).lower()
+        
+        # Extract prompt text from both old string format and new object format
+        prompt_texts = []
+        for p in prompts:
+            if isinstance(p, dict):
+                prompt_texts.append(p.get("prompt", ""))
+            else:
+                prompt_texts.append(str(p))
+        
+        joined = " ".join(prompt_texts).lower()
         # Be more flexible - only require 1-2 keywords instead of all 3
         required_keywords = min(2, len(HINT_KEYWORDS))
         matching_keywords = sum(1 for w in HINT_KEYWORDS if w in joined)
@@ -119,7 +138,15 @@ def main():
         return matching_keywords >= required_keywords
 
     def concrete_enough(prompts):
-        joined = "\n".join(prompts)
+        # Extract prompt text from both old string format and new object format
+        prompt_texts = []
+        for p in prompts:
+            if isinstance(p, dict):
+                prompt_texts.append(p.get("prompt", ""))
+            else:
+                prompt_texts.append(str(p))
+        
+        joined = "\n".join(prompt_texts)
         # More comprehensive quality checks (widget tests are optional and non-critical)
         has_dart_files = bool(re.search(r'\blib/[^\s]+\.dart\b', joined))
         has_tests = bool(re.search(r'\btest/[^\s]+_test\.dart\b', joined))
@@ -142,7 +169,13 @@ def main():
             problems.append(f"count:{len(prompts)}")
         
         # Check total length of all prompts (should be reasonable but detailed)
-        total_length = sum(len(p) for p in prompts)
+        total_length = 0
+        for p in prompts:
+            if isinstance(p, dict):
+                total_length += len(p.get("prompt", ""))
+            else:
+                total_length += len(str(p))
+        
         if os.environ.get('DEBUG_MODE') == '1':
             print(f"DEBUG: Total prompts length: {total_length} characters", file=sys.stderr)
         if total_length > 25000:  # Increased limit for extremely detailed prompts
@@ -173,7 +206,9 @@ def main():
         "CRITICAL: Each prompt must specify exact file paths, class names, method signatures, UI components, colors, spacing, and complete implementation details. "
         "MANDATORY: Remove all fake/placeholder data, create working localization with settings screen, implement fully functional features. "
         "Prioritize: 1) Remove fake data, 2) Working localization, 3) Functional features, 4) Modern Material Design 3.0, 5) Proper RTL/LTR support. "
-        "PUT widget tests as the FINAL step - they are optional and non-critical for core app functionality."
+        "PUT widget tests as the FINAL step - they are optional and non-critical for core app functionality. "
+        "VALIDATION REQUIREMENT: For each prompt, include a 'validation_criteria' field that specifies exactly what to check to verify the step was completed successfully. "
+        "Validation criteria should include: file existence checks, class/method presence, specific content patterns, and functional requirements."
     )
 
     # App spec scaffold we want the model to follow - MUCH MORE DETAILED like human prompts
@@ -181,21 +216,162 @@ def main():
         "app_name": "app_generated",
         "spec": {"theme": "light", "locale": locales[0], "platforms": ["ios"], "features": ["utility"]},
         "cursor_prompts": [
-            "Edit pubspec.yaml: Add flutter_localizations, intl ^0.19.0, provider ^6.1.1, shared_preferences ^2.2.2, cupertino_icons ^1.0.8, and any specific packages needed for the app functionality. Remove any unused dependencies and ensure all versions are compatible.",
-            "Create lib/l10n/app_en.arb: Add ALL user-facing strings including 'app_title', 'settings', 'language', 'theme', 'notifications', 'save', 'cancel', 'delete', 'edit', 'add', 'search', 'loading', 'error', 'success', 'retry', 'back', 'next', 'done', 'yes', 'no', 'ok', and feature-specific strings. Each string should be complete sentences, not fragments.",
-            "Create lib/l10n/app_ar.arb: Translate ALL strings from app_en.arb to Arabic. Ensure proper RTL text direction and cultural appropriateness. Use formal Arabic (Fusha) unless the app context requires colloquial. Include proper Arabic punctuation and formatting.",
-            "Create lib/l10n/app_localizations.dart: Implement AppLocalizations class extending LocalizationsDelegate. Add methods for all strings, proper RTL support with TextDirection.rtl for Arabic, and fallback to English. Include locale-specific number/date formatting.",
-            "Create lib/main.dart: Replace default counter app with MaterialApp 3.0. Set supportedLocales to [Locale('en'), Locale('ar')], localizationsDelegates with AppLocalizations.delegate, localeResolutionCallback for fallback, theme with Material 3.0 colors, and home pointing to MainScreen(). Remove all counter app code.",
-            "Create lib/features/settings/presentation/screens/settings_screen.dart: Build a complete settings screen with language switcher (DropdownButton with 'English' and 'العربية' options), theme toggle (Light/Dark), notification preferences, and app info section. Use Material 3.0 design with proper spacing, typography, and RTL layout support.",
-            "Create lib/features/settings/presentation/providers/settings_provider.dart: Implement ChangeNotifier with SharedPreferences for persistent storage. Include methods: setLanguage(String locale), setTheme(bool isDark), getLanguage(), getTheme(), loadSettings(), saveSettings(). Handle loading states and errors.",
-            "Create lib/features/settings/data/repositories/settings_repository.dart: Implement SettingsRepository interface with methods: saveLanguage(String locale), saveTheme(bool isDark), getLanguage(), getTheme(). Use SharedPreferences for persistence and proper error handling.",
-            "Create lib/features/core/presentation/screens/main_screen.dart: Replace MyHomePage with a proper main screen that has BottomNavigationBar with Home, Settings tabs. Include proper state management, navigation, and RTL support. Remove all counter app references and fake data.",
-            "Create lib/features/core/presentation/widgets/app_drawer.dart: Build a Material 3.0 drawer with app logo, navigation items (Home, Settings, About), language switcher, theme toggle, and proper RTL layout. Include proper spacing and typography.",
-            "Create lib/features/core/presentation/widgets/loading_widget.dart: Build a reusable loading widget with CircularProgressIndicator, proper sizing, and loading text that respects localization. Include error state with retry button.",
-            "Create lib/features/core/presentation/widgets/error_widget.dart: Build a reusable error widget with error icon, error message, retry button, and proper styling. Make it accessible and localized.",
-            "Update ios/Runner/Info.plist: Add CFBundleLocalizations array with 'en' and 'ar', CFBundleDevelopmentRegion set to 'en', and any required permissions for the app functionality. Remove any unused configurations.",
-            "Write test/features/settings/settings_provider_test.dart: Unit tests for SettingsProvider including language switching, theme toggling, persistence, and error handling. Test both English and Arabic locales.",
-            "Write test/features/core/main_screen_test.dart: Widget tests for MainScreen including navigation, RTL layout, and accessibility. Test language switching and theme changes (optional - non-critical for app functionality)."
+            {
+                "prompt": "Edit pubspec.yaml: Add flutter_localizations, intl ^0.19.0, provider ^6.1.1, shared_preferences ^2.2.2, cupertino_icons ^1.0.8, and any specific packages needed for the app functionality. Remove any unused dependencies and ensure all versions are compatible.",
+                "validation_criteria": {
+                    "file_exists": "pubspec.yaml",
+                    "contains_dependencies": ["flutter_localizations", "intl", "provider", "shared_preferences"],
+                    "no_unused_deps": true,
+                    "version_compatible": true
+                }
+            },
+            {
+                "prompt": "Create lib/l10n/app_en.arb: Add ALL user-facing strings including 'app_title', 'settings', 'language', 'theme', 'notifications', 'save', 'cancel', 'delete', 'edit', 'add', 'search', 'loading', 'error', 'success', 'retry', 'back', 'next', 'done', 'yes', 'no', 'ok', and feature-specific strings. Each string should be complete sentences, not fragments.",
+                "validation_criteria": {
+                    "file_exists": "lib/l10n/app_en.arb",
+                    "contains_keys": ["app_title", "settings", "language", "theme", "notifications", "save", "cancel"],
+                    "no_placeholders": true,
+                    "complete_sentences": true
+                }
+            },
+            {
+                "prompt": "Create lib/l10n/app_ar.arb: Translate ALL strings from app_en.arb to Arabic. Ensure proper RTL text direction and cultural appropriateness. Use formal Arabic (Fusha) unless the app context requires colloquial. Include proper Arabic punctuation and formatting.",
+                "validation_criteria": {
+                    "file_exists": "lib/l10n/app_ar.arb",
+                    "contains_keys": ["app_title", "settings", "language", "theme", "notifications", "save", "cancel"],
+                    "arabic_text": true,
+                    "rtl_support": true
+                }
+            },
+            {
+                "prompt": "Create lib/l10n/app_localizations.dart: Implement AppLocalizations class extending LocalizationsDelegate. Add methods for all strings, proper RTL support with TextDirection.rtl for Arabic, and fallback to English. Include locale-specific number/date formatting.",
+                "validation_criteria": {
+                    "file_exists": "lib/l10n/app_localizations.dart",
+                    "contains_class": "AppLocalizations",
+                    "extends_delegate": "LocalizationsDelegate",
+                    "has_rtl_support": true,
+                    "has_fallback": true
+                }
+            },
+            {
+                "prompt": "Create lib/main.dart: Replace default counter app with MaterialApp 3.0. Set supportedLocales to [Locale('en'), Locale('ar')], localizationsDelegates with AppLocalizations.delegate, localeResolutionCallback for fallback, theme with Material 3.0 colors, and home pointing to MainScreen(). Remove all counter app code.",
+                "validation_criteria": {
+                    "file_exists": "lib/main.dart",
+                    "contains_materialapp": true,
+                    "supported_locales": ["en", "ar"],
+                    "localizations_delegate": "AppLocalizations.delegate",
+                    "no_counter_code": true,
+                    "material_3_theme": true
+                }
+            },
+            {
+                "prompt": "Create lib/features/settings/presentation/screens/settings_screen.dart: Build a complete settings screen with language switcher (DropdownButton with 'English' and 'العربية' options), theme toggle (Light/Dark), notification preferences, and app info section. Use Material 3.0 design with proper spacing, typography, and RTL layout support.",
+                "validation_criteria": {
+                    "file_exists": "lib/features/settings/presentation/screens/settings_screen.dart",
+                    "contains_class": "SettingsScreen",
+                    "has_language_switcher": true,
+                    "has_theme_toggle": true,
+                    "has_notification_prefs": true,
+                    "material_3_design": true,
+                    "rtl_support": true
+                }
+            },
+            {
+                "prompt": "Create lib/features/settings/presentation/providers/settings_provider.dart: Implement ChangeNotifier with SharedPreferences for persistent storage. Include methods: setLanguage(String locale), setTheme(bool isDark), getLanguage(), getTheme(), loadSettings(), saveSettings(). Handle loading states and errors.",
+                "validation_criteria": {
+                    "file_exists": "lib/features/settings/presentation/providers/settings_provider.dart",
+                    "contains_class": "SettingsProvider",
+                    "extends_changenotifier": true,
+                    "has_methods": ["setLanguage", "setTheme", "getLanguage", "getTheme", "loadSettings", "saveSettings"],
+                    "uses_sharedpreferences": true,
+                    "has_error_handling": true
+                }
+            },
+            {
+                "prompt": "Create lib/features/settings/data/repositories/settings_repository.dart: Implement SettingsRepository interface with methods: saveLanguage(String locale), saveTheme(bool isDark), getLanguage(), getTheme(). Use SharedPreferences for persistence and proper error handling.",
+                "validation_criteria": {
+                    "file_exists": "lib/features/settings/data/repositories/settings_repository.dart",
+                    "contains_class": "SettingsRepository",
+                    "has_methods": ["saveLanguage", "saveTheme", "getLanguage", "getTheme"],
+                    "uses_sharedpreferences": true,
+                    "has_error_handling": true
+                }
+            },
+            {
+                "prompt": "Create lib/features/core/presentation/screens/main_screen.dart: Replace MyHomePage with a proper main screen that has BottomNavigationBar with Home, Settings tabs. Include proper state management, navigation, and RTL support. Remove all counter app references and fake data.",
+                "validation_criteria": {
+                    "file_exists": "lib/features/core/presentation/screens/main_screen.dart",
+                    "contains_class": "MainScreen",
+                    "has_bottom_navigation": true,
+                    "has_tabs": ["Home", "Settings"],
+                    "no_counter_references": true,
+                    "no_fake_data": true,
+                    "rtl_support": true
+                }
+            },
+            {
+                "prompt": "Create lib/features/core/presentation/widgets/app_drawer.dart: Build a Material 3.0 drawer with app logo, navigation items (Home, Settings, About), language switcher, theme toggle, and proper RTL layout. Include proper spacing and typography.",
+                "validation_criteria": {
+                    "file_exists": "lib/features/core/presentation/widgets/app_drawer.dart",
+                    "contains_class": "AppDrawer",
+                    "has_navigation_items": ["Home", "Settings", "About"],
+                    "has_language_switcher": true,
+                    "has_theme_toggle": true,
+                    "material_3_design": true,
+                    "rtl_support": true
+                }
+            },
+            {
+                "prompt": "Create lib/features/core/presentation/widgets/loading_widget.dart: Build a reusable loading widget with CircularProgressIndicator, proper sizing, and loading text that respects localization. Include error state with retry button.",
+                "validation_criteria": {
+                    "file_exists": "lib/features/core/presentation/widgets/loading_widget.dart",
+                    "contains_class": "LoadingWidget",
+                    "has_circular_progress": true,
+                    "has_loading_text": true,
+                    "has_error_state": true,
+                    "has_retry_button": true,
+                    "localized_text": true
+                }
+            },
+            {
+                "prompt": "Create lib/features/core/presentation/widgets/error_widget.dart: Build a reusable error widget with error icon, error message, retry button, and proper styling. Make it accessible and localized.",
+                "validation_criteria": {
+                    "file_exists": "lib/features/core/presentation/widgets/error_widget.dart",
+                    "contains_class": "ErrorWidget",
+                    "has_error_icon": true,
+                    "has_error_message": true,
+                    "has_retry_button": true,
+                    "accessible": true,
+                    "localized": true
+                }
+            },
+            {
+                "prompt": "Update ios/Runner/Info.plist: Add CFBundleLocalizations array with 'en' and 'ar', CFBundleDevelopmentRegion set to 'en', and any required permissions for the app functionality. Remove any unused configurations.",
+                "validation_criteria": {
+                    "file_exists": "ios/Runner/Info.plist",
+                    "has_cfbundle_localizations": ["en", "ar"],
+                    "has_cfbundle_development_region": "en",
+                    "no_unused_configs": true
+                }
+            },
+            {
+                "prompt": "Write test/features/settings/settings_provider_test.dart: Unit tests for SettingsProvider including language switching, theme toggling, persistence, and error handling. Test both English and Arabic locales.",
+                "validation_criteria": {
+                    "file_exists": "test/features/settings/settings_provider_test.dart",
+                    "has_test_functions": ["language_switching", "theme_toggling", "persistence", "error_handling"],
+                    "tests_both_locales": ["en", "ar"]
+                }
+            },
+            {
+                "prompt": "Write test/features/core/main_screen_test.dart: Widget tests for MainScreen including navigation, RTL layout, and accessibility. Test language switching and theme changes (optional - non-critical for app functionality).",
+                "validation_criteria": {
+                    "file_exists": "test/features/core/main_screen_test.dart",
+                    "has_widget_tests": true,
+                    "tests_navigation": true,
+                    "tests_rtl_layout": true,
+                    "tests_accessibility": true
+                }
+            }
         ],
         "meta": {
             "requested_locales": locales,
@@ -251,7 +427,25 @@ Return JSON EXACTLY with keys:
 {{
   "app_name": "lowercase_snake_case_name",
   "spec": {{"theme":"light|dark","locale":"{locales[0]}", "platforms":["ios"], "features":["feature_name"]}},
-  "cursor_prompts": ["extremely detailed step 1 with specific files, classes, methods, UI details...", "extremely detailed step 2...", "..."],
+  "cursor_prompts": [
+    {{
+      "prompt": "extremely detailed step 1 with specific files, classes, methods, UI details...",
+      "validation_criteria": {{
+        "file_exists": "path/to/file.dart",
+        "contains_class": "ClassName",
+        "has_methods": ["method1", "method2"],
+        "specific_requirements": true
+      }}
+    }},
+    {{
+      "prompt": "extremely detailed step 2...",
+      "validation_criteria": {{
+        "file_exists": "path/to/file.dart",
+        "contains_pattern": "specific content pattern",
+        "functional_requirement": true
+      }}
+    }}
+  ],
   "meta": {{"requested_locales": {json.dumps(locales)}, "bundle_id_hint": "{bundle_id}", "feature_summary": "1-line feature description"}}
 }}
 """

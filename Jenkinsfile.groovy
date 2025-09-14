@@ -158,7 +158,7 @@ MD
 
 
     stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTINEL)') {
-      options { timeout(time: 20, unit: 'MINUTES') }
+      options { timeout(time: 45, unit: 'MINUTES') }
       steps {
         withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin", "CURSOR_CI=1"]) {
           sh '''
@@ -294,16 +294,16 @@ DART
 
           # Use gtimeout with retry logic for auto-fix
           if command -v gtimeout >/dev/null 2>&1; then
-            echo "🔄 Running auto-fix with gtimeout (3 min limit)..."
+              echo "🔄 Running auto-fix with gtimeout (10 min limit)..."
             # Kill any existing cursor processes first
             pkill -f "cursor-agent" 2>/dev/null || true
             sleep 2
             
-            if gtimeout --kill-after=5s 180 python3 "${WORKSPACE}/Python/cursor_fix.py"; then
+            if gtimeout --kill-after=10s 600 python3 "${WORKSPACE}/Python/cursor_fix.py"; then
               echo "✅ Auto-fix completed successfully"
               return 0
             else
-              echo "⚠️  Auto-fix attempt timed out after 3 minutes"
+              echo "⚠️  Auto-fix attempt timed out after 10 minutes"
               echo "🔄 Killing any remaining cursor processes..."
               pkill -f "cursor-agent" 2>/dev/null || true
               sleep 2
@@ -353,12 +353,12 @@ DART
             
             # Use gtimeout with proper signal handling for macOS
             if command -v gtimeout >/dev/null 2>&1; then
-              echo "🔄 Running cursor with gtimeout (5 min limit) - attempt $RETRY_COUNT..."
+              echo "🔄 Running cursor with gtimeout (15 min limit) - attempt $RETRY_COUNT..."
               # Kill any existing cursor processes first
               pkill -f "cursor-agent" 2>/dev/null || true
               sleep 2
               
-              if gtimeout --kill-after=10s 300 python3 "${WORKSPACE}/Python/cursor_run.py"; then
+              if gtimeout --kill-after=15s 900 python3 "${WORKSPACE}/Python/cursor_run.py"; then
                 echo "✅ Cursor execution completed successfully on attempt $RETRY_COUNT"
                 return 0
               else
@@ -392,21 +392,62 @@ DART
           
           echo "🔍 Running validation for step ${STEP_NO}..."
           
+          # Use smart validation script if available
+          if [ -f "${WORKSPACE}/Python/smart_validate.py" ]; then
+            echo "🧠 Using smart validation with AI-generated criteria..."
+            if python3 "${WORKSPACE}/Python/smart_validate.py" "$STEP_NO" "$STEP_CONTENT"; then
+              echo "✅ Smart validation passed"
+              return 0
+            else
+              echo "❌ Smart validation failed"
+              return 1
+            fi
+          fi
+          
+          # Fallback to basic validation
+          echo "⚠️  Smart validation not available - using basic validation..."
+          
           case "$STEP_NO" in
             3)
-              # After HomeScreen creation
-              echo "📱 Validating HomeScreen creation..."
-              if [ -f "lib/features/home/home_screen.dart" ]; then
-                echo "✅ HomeScreen file exists"
-                if grep -q "class.*HomeScreen" "lib/features/home/home_screen.dart"; then
-                  echo "✅ HomeScreen class found"
+              # After screen creation - dynamic validation based on prompt content
+              echo "📱 Validating screen creation..."
+              if echo "$STEP_CONTENT" | grep -qi "settings"; then
+                echo "⚙️  Validating settings screen creation..."
+                if [ -f "lib/features/settings/presentation/screens/settings_screen.dart" ]; then
+                  echo "✅ Settings screen file exists"
+                  if grep -q "class.*SettingsScreen" "lib/features/settings/presentation/screens/settings_screen.dart"; then
+                    echo "✅ Settings screen class found"
+                  else
+                    echo "❌ Settings screen class not found"
+                    return 1
+                  fi
                 else
-                  echo "❌ HomeScreen class not found"
+                  echo "❌ Settings screen file not found"
+                  return 1
+                fi
+              elif echo "$STEP_CONTENT" | grep -qi "home"; then
+                echo "🏠 Validating home screen creation..."
+                if [ -f "lib/features/home/home_screen.dart" ]; then
+                  echo "✅ HomeScreen file exists"
+                  if grep -q "class.*HomeScreen" "lib/features/home/home_screen.dart"; then
+                    echo "✅ HomeScreen class found"
+                  else
+                    echo "❌ HomeScreen class not found"
+                    return 1
+                  fi
+                else
+                  echo "❌ HomeScreen file not found"
                   return 1
                 fi
               else
-                echo "❌ HomeScreen file not found"
-                return 1
+                echo "ℹ️  Generic screen validation - checking for any screen creation..."
+                # Generic validation - check if any screen was created
+                if find lib/features -name "*_screen.dart" | head -1; then
+                  echo "✅ Screen files found"
+                else
+                  echo "❌ No screen files found"
+                  return 1
+                fi
               fi
               ;;
             4)
@@ -459,8 +500,17 @@ DART
             6)
               # After Localization
               echo "🌍 Validating localization..."
-              if [ -f "lib/features/shared/l10n/intl_en.arb" ] && [ -f "lib/features/shared/l10n/intl_ar.arb" ]; then
-                echo "✅ Localization files exist"
+              # Check both possible locations for localization files
+              if [ -f "lib/l10n/intl_en.arb" ] && [ -f "lib/l10n/intl_ar.arb" ]; then
+                echo "✅ Localization files exist in lib/l10n/"
+                if grep -q "app_title\\|settings\\|language" "lib/l10n/intl_en.arb"; then
+                  echo "✅ Localization keys found"
+                else
+                  echo "❌ Localization keys not found"
+                  return 1
+                fi
+              elif [ -f "lib/features/shared/l10n/intl_en.arb" ] && [ -f "lib/features/shared/l10n/intl_ar.arb" ]; then
+                echo "✅ Localization files exist in lib/features/shared/l10n/"
                 if grep -q "app_title\\|settings\\|language" "lib/features/shared/l10n/intl_en.arb"; then
                   echo "✅ Localization keys found"
                 else
@@ -468,7 +518,7 @@ DART
                   return 1
                 fi
               else
-                echo "❌ Localization files not found"
+                echo "❌ Localization files not found in either location"
                 return 1
               fi
               ;;
@@ -481,7 +531,16 @@ DART
                 python3 "${WORKSPACE}/Python/validate_feature.py" savings || return 1
               elif echo "$STEP_CONTENT" | grep -qi "settings"; then
                 echo "⚙️  Validating settings feature integration..."
-                python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+                # Try smart validation first, fallback to basic if needed
+                if [ -f "${WORKSPACE}/Python/smart_validate_feature.py" ]; then
+                  echo "🧠 Using smart validation for settings feature..."
+                  python3 "${WORKSPACE}/Python/smart_validate_feature.py" settings || {
+                    echo "⚠️  Smart validation failed, trying basic validation..."
+                    python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+                  }
+                else
+                  python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+                fi
               else
                 echo "ℹ️  Generic secondary feature validation..."
                 # Check for any additional feature screens
@@ -497,9 +556,22 @@ DART
             8)
               # After SettingsScreen creation - dynamic validation
               echo "⚙️  Validating settings feature integration..."
-              if [ -f "lib/settings/presentation/screens/settings_screen.dart" ]; then
-                echo "✅ Settings screen found"
+              # Check both possible locations for settings screen
+              if [ -f "lib/features/settings/presentation/screens/settings_screen.dart" ]; then
+                echo "✅ Settings screen found in lib/features/settings/"
                 python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+              elif [ -f "lib/settings/presentation/screens/settings_screen.dart" ]; then
+                echo "✅ Settings screen found in lib/settings/"
+                # Try smart validation first, fallback to basic if needed
+                if [ -f "${WORKSPACE}/Python/smart_validate_feature.py" ]; then
+                  echo "🧠 Using smart validation for settings feature..."
+                  python3 "${WORKSPACE}/Python/smart_validate_feature.py" settings || {
+                    echo "⚠️  Smart validation failed, trying basic validation..."
+                    python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+                  }
+                else
+                  python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
+                fi
               else
                 echo "ℹ️  No settings screen found - checking for general settings elements..."
                 if find lib/features -name "*screen.dart" -exec grep -l "settings\\\\|Settings" {} \\; | head -1; then
@@ -717,18 +789,38 @@ DART
         VALIDATION_START_TIME=$(date +%s)
         
         # Run comprehensive integration validation - always continue
-        if python3 "${WORKSPACE}/Python/validate_integration.py"; then
-          echo "✅ Integration validation passed"
-        else
-          echo "❌ Integration validation failed"
-          echo "🔄 Attempting to clean up placeholders..."
-          python3 "${WORKSPACE}/Python/cleanup_placeholders.py" || true
-          echo "🔄 Re-running integration validation..."
-          if python3 "${WORKSPACE}/Python/validate_integration.py"; then
-            echo "✅ Integration validation passed after cleanup"
+        # Try smart validation first, fallback to basic if needed
+        if [ -f "${WORKSPACE}/Python/smart_validate_integration.py" ]; then
+          echo "🧠 Using smart integration validation..."
+          if python3 "${WORKSPACE}/Python/smart_validate_integration.py"; then
+            echo "✅ Smart integration validation passed"
           else
-            echo "⚠️  Integration validation still has issues after cleanup"
-            echo "📝 Continuing with warnings - build will proceed"
+            echo "❌ Smart integration validation failed"
+            echo "🔄 Attempting to clean up placeholders..."
+            python3 "${WORKSPACE}/Python/cleanup_placeholders.py" || true
+            echo "🔄 Re-running with basic integration validation..."
+            if python3 "${WORKSPACE}/Python/validate_integration.py"; then
+              echo "✅ Integration validation passed after cleanup"
+            else
+              echo "⚠️  Integration validation still has issues after cleanup"
+              echo "📝 Continuing with warnings - build will proceed"
+            fi
+          fi
+        else
+          echo "📋 Using basic integration validation..."
+          if python3 "${WORKSPACE}/Python/validate_integration.py"; then
+            echo "✅ Integration validation passed"
+          else
+            echo "❌ Integration validation failed"
+            echo "🔄 Attempting to clean up placeholders..."
+            python3 "${WORKSPACE}/Python/cleanup_placeholders.py" || true
+            echo "🔄 Re-running integration validation..."
+            if python3 "${WORKSPACE}/Python/validate_integration.py"; then
+              echo "✅ Integration validation passed after cleanup"
+            else
+              echo "⚠️  Integration validation still has issues after cleanup"
+              echo "📝 Continuing with warnings - build will proceed"
+            fi
           fi
         fi
         
@@ -864,16 +956,16 @@ PROMPT
 
   # Use gtimeout with retry logic for build fix
   if command -v gtimeout >/dev/null 2>&1; then
-    echo "🔄 Running build fix with gtimeout (5 min limit)..."
+    echo "🔄 Running build fix with gtimeout (15 min limit)..."
     # Kill any existing cursor processes first
     pkill -f "cursor-agent" 2>/dev/null || true
     sleep 2
     
-    if gtimeout --kill-after=10s 300 python3 "${WORKSPACE}/Python/build_fix.py"; then
+    if gtimeout --kill-after=15s 900 python3 "${WORKSPACE}/Python/build_fix.py"; then
       echo "✅ Build fix completed successfully"
       return 0
     else
-      echo "⚠️  Build fix attempt timed out after 5 minutes"
+      echo "⚠️  Build fix attempt timed out after 15 minutes"
       echo "🔄 Killing any remaining cursor processes..."
       pkill -f "cursor-agent" 2>/dev/null || true
       sleep 2
