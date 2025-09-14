@@ -360,7 +360,7 @@ DART
                 fi
               else
                 echo "ℹ️  No specific form screen found - checking for general form elements..."
-                if find lib/features -name "*screen.dart" -exec grep -l "Form\\|TextFormField\\|ElevatedButton\\|TextField" {} \; | head -1; then
+                if find lib/features -name "*screen.dart" -exec grep -l "Form\\\\|TextFormField\\\\|ElevatedButton\\\\|TextField" {} \\; | head -1; then
                   echo "✅ Form elements found in screens"
                 else
                   echo "❌ No form elements found"
@@ -414,7 +414,7 @@ DART
                 python3 "${WORKSPACE}/Python/validate_feature.py" settings || return 1
               else
                 echo "ℹ️  No settings screen found - checking for general settings elements..."
-                if find lib/features -name "*screen.dart" -exec grep -l "settings\\|Settings" {} \; | head -1; then
+                if find lib/features -name "*screen.dart" -exec grep -l "settings\\\\|Settings" {} \\; | head -1; then
                   echo "✅ Settings elements found"
                 else
                   echo "❌ No settings elements found"
