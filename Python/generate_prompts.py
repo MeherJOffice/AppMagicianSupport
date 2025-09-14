@@ -90,7 +90,7 @@ def main():
     def prompt_is_valid(p):
         if not isinstance(p, str) or not p.strip():
             return False, "empty"
-        if len(p) > 5000:  # Increased to 5000 for detailed, high-quality prompts
+        if len(p) > 8000:  # Increased to 8000 for extremely detailed, human-level prompts
             return False, "too_long"
         s = p.lower()
         if '```' in p:
@@ -138,14 +138,14 @@ def main():
         if not isinstance(prompts, list) or not prompts:
             return False, ["prompts_missing"]
         problems = []
-        if not (8 <= len(prompts) <= 12):  # Updated range for detailed prompts
+        if not (12 <= len(prompts) <= 15):  # Updated range for extremely detailed prompts
             problems.append(f"count:{len(prompts)}")
         
         # Check total length of all prompts (should be reasonable but detailed)
         total_length = sum(len(p) for p in prompts)
         if os.environ.get('DEBUG_MODE') == '1':
             print(f"DEBUG: Total prompts length: {total_length} characters", file=sys.stderr)
-        if total_length > 15000:  # Total length limit for all prompts combined
+        if total_length > 25000:  # Increased limit for extremely detailed prompts
             problems.append(f"total_length:{total_length}")
         
         for i, p in enumerate(prompts):
@@ -165,29 +165,37 @@ def main():
 
     system_msg = (
         "You are a senior Flutter iOS lead working INSIDE an existing repo. "
-        "Your task is to generate HIGH-QUALITY, PRODUCTION-READY app specifications. "
-        "Focus on POLISHED, MODERN UI/UX with proper localization support. "
+        "Your task is to generate EXTREMELY DETAILED, PRODUCTION-READY app specifications. "
+        "Each prompt must be as detailed as a human would ask ChatGPT for Cursor prompts. "
+        "Focus on POLISHED, MODERN UI/UX with working localization and NO fake data. "
         "Return STRICT JSON only. Do NOT suggest creating projects. "
         "Every step must edit explicit files under pubspec.yaml, analysis_options.yaml, lib/**, test/**, or ios/** (safe files only). "
-        "Prioritize: 1) Modern Material Design 3.0, 2) Proper RTL/LTR support, 3) Clean architecture, 4) Core functionality, 5) Accessibility. "
+        "CRITICAL: Each prompt must specify exact file paths, class names, method signatures, UI components, colors, spacing, and complete implementation details. "
+        "MANDATORY: Remove all fake/placeholder data, create working localization with settings screen, implement fully functional features. "
+        "Prioritize: 1) Remove fake data, 2) Working localization, 3) Functional features, 4) Modern Material Design 3.0, 5) Proper RTL/LTR support. "
         "PUT widget tests as the FINAL step - they are optional and non-critical for core app functionality."
     )
 
-    # App spec scaffold we want the model to follow
+    # App spec scaffold we want the model to follow - MUCH MORE DETAILED like human prompts
     spec_hint = {
         "app_name": "app_generated",
         "spec": {"theme": "light", "locale": locales[0], "platforms": ["ios"], "features": ["utility"]},
         "cursor_prompts": [
-            "Edit pubspec.yaml: add modern dependencies (flutter_localizations, material_design_icons, etc.) with latest versions.",
-            "Create lib/l10n/app_en.arb and lib/l10n/app_ar.arb: comprehensive localization files with ALL user-facing strings.",
-            "Create lib/features/core/localization/app_localizations.dart: robust RTL/LTR support with proper text direction handling.",
-            "Create lib/main.dart: setup MaterialApp 3.0 with theme, localization, RTL support, and accessibility.",
-            "Create lib/features/<feature>/presentation/widgets/<feature>_screen.dart: modern Material 3.0 UI with proper spacing, typography, and RTL layout.",
-            "Create lib/features/<feature>/data/repositories/<feature>_repository.dart: clean data layer with proper error handling.",
-            "Create lib/features/<feature>/domain/entities/<feature>_entity.dart: domain models with validation.",
-            "Create lib/features/<feature>/presentation/providers/<feature>_provider.dart: state management with proper error handling and loading states.",
-            "Update ios/Runner/Info.plist: configure proper app metadata, supported orientations, and accessibility settings.",
-            "Write comprehensive widget tests in test/widgets/<feature>_screen_test.dart: validate UI accessibility and navigation flows (optional - non-critical for app functionality)."
+            "Edit pubspec.yaml: Add flutter_localizations, intl ^0.19.0, provider ^6.1.1, shared_preferences ^2.2.2, cupertino_icons ^1.0.8, and any specific packages needed for the app functionality. Remove any unused dependencies and ensure all versions are compatible.",
+            "Create lib/l10n/app_en.arb: Add ALL user-facing strings including 'app_title', 'settings', 'language', 'theme', 'notifications', 'save', 'cancel', 'delete', 'edit', 'add', 'search', 'loading', 'error', 'success', 'retry', 'back', 'next', 'done', 'yes', 'no', 'ok', and feature-specific strings. Each string should be complete sentences, not fragments.",
+            "Create lib/l10n/app_ar.arb: Translate ALL strings from app_en.arb to Arabic. Ensure proper RTL text direction and cultural appropriateness. Use formal Arabic (Fusha) unless the app context requires colloquial. Include proper Arabic punctuation and formatting.",
+            "Create lib/l10n/app_localizations.dart: Implement AppLocalizations class extending LocalizationsDelegate. Add methods for all strings, proper RTL support with TextDirection.rtl for Arabic, and fallback to English. Include locale-specific number/date formatting.",
+            "Create lib/main.dart: Replace default counter app with MaterialApp 3.0. Set supportedLocales to [Locale('en'), Locale('ar')], localizationsDelegates with AppLocalizations.delegate, localeResolutionCallback for fallback, theme with Material 3.0 colors, and home pointing to MainScreen(). Remove all counter app code.",
+            "Create lib/features/settings/presentation/screens/settings_screen.dart: Build a complete settings screen with language switcher (DropdownButton with 'English' and 'العربية' options), theme toggle (Light/Dark), notification preferences, and app info section. Use Material 3.0 design with proper spacing, typography, and RTL layout support.",
+            "Create lib/features/settings/presentation/providers/settings_provider.dart: Implement ChangeNotifier with SharedPreferences for persistent storage. Include methods: setLanguage(String locale), setTheme(bool isDark), getLanguage(), getTheme(), loadSettings(), saveSettings(). Handle loading states and errors.",
+            "Create lib/features/settings/data/repositories/settings_repository.dart: Implement SettingsRepository interface with methods: saveLanguage(String locale), saveTheme(bool isDark), getLanguage(), getTheme(). Use SharedPreferences for persistence and proper error handling.",
+            "Create lib/features/core/presentation/screens/main_screen.dart: Replace MyHomePage with a proper main screen that has BottomNavigationBar with Home, Settings tabs. Include proper state management, navigation, and RTL support. Remove all counter app references and fake data.",
+            "Create lib/features/core/presentation/widgets/app_drawer.dart: Build a Material 3.0 drawer with app logo, navigation items (Home, Settings, About), language switcher, theme toggle, and proper RTL layout. Include proper spacing and typography.",
+            "Create lib/features/core/presentation/widgets/loading_widget.dart: Build a reusable loading widget with CircularProgressIndicator, proper sizing, and loading text that respects localization. Include error state with retry button.",
+            "Create lib/features/core/presentation/widgets/error_widget.dart: Build a reusable error widget with error icon, error message, retry button, and proper styling. Make it accessible and localized.",
+            "Update ios/Runner/Info.plist: Add CFBundleLocalizations array with 'en' and 'ar', CFBundleDevelopmentRegion set to 'en', and any required permissions for the app functionality. Remove any unused configurations.",
+            "Write test/features/settings/settings_provider_test.dart: Unit tests for SettingsProvider including language switching, theme toggling, persistence, and error handling. Test both English and Arabic locales.",
+            "Write test/features/core/main_screen_test.dart: Widget tests for MainScreen including navigation, RTL layout, and accessibility. Test language switching and theme changes (optional - non-critical for app functionality)."
         ],
         "meta": {
             "requested_locales": locales,
@@ -198,40 +206,52 @@ def main():
 
     # User message that forces alignment with the hint and forbids project creation
     user_msg = f"""
-Create a **HIGH-QUALITY iOS Flutter app** based on this idea:
+Create a **PRODUCTION-READY iOS Flutter app** based on this idea:
 "{prompt_hint}"
 
-CRITICAL QUALITY REQUIREMENTS:
-- Generate 8–12 DETAILED prompts for a POLISHED, PRODUCTION-READY app
-- Each prompt must specify EXACT files to create/modify: pubspec.yaml, analysis_options.yaml, lib/**, test/**, ios/Runner/Info.plist
-- Focus STRICTLY on the hinted idea - no unrelated features
-- MANDATORY: Full localization support for {json.dumps(locales)} with proper RTL/LTR handling
-- MANDATORY: Modern Material Design 3.0 with proper spacing, typography, and animations
-- MANDATORY: Clean architecture (presentation/data/domain layers)
-- MANDATORY: Core functionality that makes the app work (business logic, data, UI)
-- MANDATORY: Accessibility support (semantics, screen readers)
-- OPTIONAL: Widget tests as the FINAL step - they are non-critical and can fail without breaking the pipeline
-- NO secrets/hardcoded values - use proper configuration patterns
+CRITICAL REQUIREMENTS - BE EXTREMELY DETAILED:
 
-LOCALIZATION REQUIREMENTS:
-- ALL user-facing text MUST be in localization files (.arb)
-- Proper RTL layout for Arabic (text direction, UI mirroring)
-- No mixed languages - either fully localized or fallback to English
-- Include proper number/date formatting for each locale
+1. **REMOVE ALL FAKE/PLACEHOLDER DATA**: 
+   - Delete all counter app code, fake todos, sample data, placeholder text
+   - Replace with real, functional features that match the app idea
+   - No "Lorem ipsum", "Sample text", or demo content
 
-UI/UX REQUIREMENTS:
-- Modern Material 3.0 design system
-- Proper color schemes and typography
-- Smooth animations and transitions
-- Responsive layout for different screen sizes
-- Loading states and error handling
-- Intuitive navigation and user flow
+2. **WORKING LOCALIZATION SYSTEM**:
+   - Create complete .arb files with ALL user-facing strings
+   - Build a settings screen with language switcher (English/Arabic dropdown)
+   - Implement proper RTL layout for Arabic (text direction, UI mirroring)
+   - Add persistent language storage with SharedPreferences
+   - Test language switching works immediately
+
+3. **POLISHED UI/UX**:
+   - Material Design 3.0 with proper color schemes, typography, spacing
+   - Smooth animations, loading states, error handling
+   - Responsive layout, proper navigation, intuitive user flow
+   - Remove all default Flutter styling, create custom polished design
+
+4. **WORKING FEATURES**:
+   - Each feature must be fully functional, not just UI mockups
+   - Real data persistence, proper state management
+   - Error handling, loading states, user feedback
+   - Features must work in both English and Arabic
+
+5. **DETAILED PROMPTS** (like a human would ask):
+   - Specify exact file paths, class names, method signatures
+   - Include specific UI components, colors, spacing values
+   - Detail the complete implementation, not just "create a screen"
+   - Mention specific packages, versions, and configurations
+   - Include proper error handling and edge cases
+
+EXAMPLE OF DETAILED PROMPT:
+"Create lib/features/reminder/presentation/screens/reminder_screen.dart: Build a complete reminder screen with FloatingActionButton for adding reminders, ListView.builder for displaying reminders with CheckboxListTile, proper Material 3.0 styling with primary color #2196F3, spacing of 16px between items, and RTL support. Include empty state with Icon(Icons.alarm_off) and Text('No reminders yet'). Handle loading states with CircularProgressIndicator and errors with SnackBar."
+
+Generate 12-15 EXTREMELY DETAILED prompts that create a fully functional, polished app with working localization, no fake data, and production-ready features.
 
 Return JSON EXACTLY with keys:
 {{
   "app_name": "lowercase_snake_case_name",
   "spec": {{"theme":"light|dark","locale":"{locales[0]}", "platforms":["ios"], "features":["feature_name"]}},
-  "cursor_prompts": ["detailed step 1 with specific files...", "detailed step 2...", "..."],
+  "cursor_prompts": ["extremely detailed step 1 with specific files, classes, methods, UI details...", "extremely detailed step 2...", "..."],
   "meta": {{"requested_locales": {json.dumps(locales)}, "bundle_id_hint": "{bundle_id}", "feature_summary": "1-line feature description"}}
 }}
 """
