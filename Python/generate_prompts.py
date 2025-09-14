@@ -90,7 +90,7 @@ def main():
     def prompt_is_valid(p):
         if not isinstance(p, str) or not p.strip():
             return False, "empty"
-        if len(p) > 1000:
+        if len(p) > 3000:  # Increased from 1000 to 3000 for more detailed prompts
             return False, "too_long"
         s = p.lower()
         if '```' in p:
@@ -108,7 +108,13 @@ def main():
         if not HINT_KEYWORDS:
             return True
         joined = " ".join(prompts).lower()
-        return all(w in joined for w in set(HINT_KEYWORDS[:3]))  # require a few keywords appear
+        # Be more flexible - only require 1-2 keywords instead of all 3
+        required_keywords = min(2, len(HINT_KEYWORDS))
+        matching_keywords = sum(1 for w in HINT_KEYWORDS if w in joined)
+        if os.environ.get('DEBUG_MODE') == '1':
+            print(f"DEBUG: Hint keywords: {HINT_KEYWORDS}", file=sys.stderr)
+            print(f"DEBUG: Required: {required_keywords}, Found: {matching_keywords}", file=sys.stderr)
+        return matching_keywords >= required_keywords
 
     def concrete_enough(prompts):
         joined = "\n".join(prompts)
