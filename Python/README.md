@@ -206,6 +206,34 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   python3 Python/verify_build.py --app-root /path/to/app
   ```
 
+### `error_recovery.py`
+- **Purpose**: Handles common pipeline failures and automatically fixes them
+- **Usage**: Command line tool to detect and fix common Flutter errors
+- **Arguments**:
+  - `--app-root`: Path to app root directory (optional)
+  - `--rollback-on-failure`: Rollback changes if recovery fails (optional)
+  - `--verbose`: Enable verbose output (optional)
+- **Environment Variables**:
+  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
+- **Error Detection & Recovery**:
+  - Detect common error patterns (missing imports, provider issues, navigation problems)
+  - Automatically fix common issues (update imports, fix provider usage, etc.)
+  - Provide detailed error analysis and suggested fixes
+  - Create backup of working state before attempting fixes
+  - Log all recovery attempts and their results
+  - Include rollback functionality if fixes fail
+- **Exit Codes**:
+  - `0`: Error recovery successful
+  - `1`: Error recovery failed
+- **Examples**:
+  ```bash
+  python3 Python/error_recovery.py
+  python3 Python/error_recovery.py --rollback-on-failure
+  python3 Python/error_recovery.py --verbose
+  python3 Python/error_recovery.py --app-root /path/to/app
+  ```
+
 ## Requirements
 
 - Python 3.6+
