@@ -12,6 +12,7 @@ pipeline {
     booleanParam(name: 'INCLUDE_LOCALIZATION', defaultValue: true, description: 'Generate i18n scaffolding?')
     string(name: 'LOCALES', defaultValue: 'en,ar,fr,tr', description: 'Comma-separated BCP-47 codes when localization is enabled')
     string(name: 'BUNDLE_ID', defaultValue: 'com.example.myapp', description: 'iOS bundle identifier (e.g. com.company.app)')
+    booleanParam(name: 'TEST_MODE', defaultValue: false, description: 'Enable test mode (bypasses API calls, generates mock data)')
 
   }
 
@@ -20,6 +21,8 @@ pipeline {
     DEEPSEEK_API_KEY = credentials('deepseek_api_key')   // used if LLM_PROVIDER=deepseek
     CURSOR_API_KEY   = credentials('cursor_api_key')     // for cursor-agent
     APP_ROOT = "${HOME}/AppMagician"
+    DEBUG_MODE = '1'                                     // Enable debug output
+    TEST_MODE = "${params.TEST_MODE ? '1' : '0'}"       // Pass test mode parameter
   }
 
   options { timestamps(); ansiColor('xterm'); disableConcurrentBuilds() }
