@@ -836,6 +836,7 @@ fi
       }
     }
   }
+}
 
   post {
     success {
