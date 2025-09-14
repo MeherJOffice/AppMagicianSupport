@@ -77,82 +77,81 @@ pipeline {
       }
     }
 
-stage('Generate idea + prompts (ChatGPT or DeepSeek)') {
-  steps {
-    withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
-      sh '''
-        set -euo pipefail
-        python3 "${WORKSPACE}/Python/generate_prompts.py"
-        echo '------ app_spec.json ------'
-        cat out/app_spec.json || true
-        echo '---------------------------'
-      '''
+    stage('Generate idea + prompts (ChatGPT or DeepSeek)') {
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+          sh '''
+            set -euo pipefail
+            python3 "${WORKSPACE}/Python/generate_prompts.py"
+            echo '------ app_spec.json ------'
+            cat out/app_spec.json || true
+            echo '---------------------------'
+          '''
+        }
+      }
     }
-  }
-}
-}
 
 
 
 
 
-stage('Create project under ~/AppMagician/<AppName>') {
-  steps {
-    withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
-      sh '''
-        set -euo pipefail
-        APP_JSON="$WORKSPACE/out/app_spec.json"
-        RAW_NAME="$(jq -r '.app_name // empty' "$APP_JSON" 2>/dev/null || true)"
-        [ -z "$RAW_NAME" ] && RAW_NAME="$(cat "$WORKSPACE/out/app_dir.txt" 2>/dev/null || true)"
-        RAW_NAME="${RAW_NAME:-$APP_DIR}"
+    stage('Create project under ~/AppMagician/<AppName>') {
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+          sh '''
+            set -euo pipefail
+            APP_JSON="$WORKSPACE/out/app_spec.json"
+            RAW_NAME="$(jq -r '.app_name // empty' "$APP_JSON" 2>/dev/null || true)"
+            [ -z "$RAW_NAME" ] && RAW_NAME="$(cat "$WORKSPACE/out/app_dir.txt" 2>/dev/null || true)"
+            RAW_NAME="${RAW_NAME:-$APP_DIR}"
 
-        # sanitize to valid Dart package
-        SANITIZED="$(printf '%s' "$RAW_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_]+/_/g; s/^_+//; s/_+$//')"
-        case "$SANITIZED" in
-          [a-z]* ) ;;
-          * ) SANITIZED="app_${SANITIZED}";;
-        esac
-        SANITIZED="${SANITIZED:-app_generated}"
-        echo "$SANITIZED" > "$WORKSPACE/out/app_dir.txt"
+            # sanitize to valid Dart package
+            SANITIZED="$(printf '%s' "$RAW_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_]+/_/g; s/^_+//; s/_+$//')"
+            case "$SANITIZED" in
+              [a-z]* ) ;;
+              * ) SANITIZED="app_${SANITIZED}";;
+            esac
+            SANITIZED="${SANITIZED:-app_generated}"
+            echo "$SANITIZED" > "$WORKSPACE/out/app_dir.txt"
 
-        APP_DIR="$SANITIZED"
-        BUNDLE_ID="${BUNDLE_ID:-com.example.generated}"
-        APP_ORG="$(printf '%s' "$BUNDLE_ID" | sed -E 's/\\.[^.]+$//')"
-        APP_ROOT="${APP_ROOT:-$HOME/AppMagician}"
+            APP_DIR="$SANITIZED"
+            BUNDLE_ID="${BUNDLE_ID:-com.example.generated}"
+            APP_ORG="$(printf '%s' "$BUNDLE_ID" | sed -E 's/\\.[^.]+$//')"
+            APP_ROOT="${APP_ROOT:-$HOME/AppMagician}"
 
-        mkdir -p "${APP_ROOT}"
-        cd "${APP_ROOT}"
-        if [ ! -d "${APP_DIR}" ]; then
-          flutter create --platforms=ios --org "$APP_ORG" "${APP_DIR}"
-        fi
+            mkdir -p "${APP_ROOT}"
+            cd "${APP_ROOT}"
+            if [ ! -d "${APP_DIR}" ]; then
+              flutter create --platforms=ios --org "$APP_ORG" "${APP_DIR}"
+            fi
 
-        cd "${APP_DIR}"
-        PBX="ios/Runner.xcodeproj/project.pbxproj"
-        if [ -f "$PBX" ]; then
-          if [ "$(uname)" = "Darwin" ]; then SED=( -i '' ); else SED=( -i ); fi
-          sed "${SED[@]}" -E "s/(PRODUCT_BUNDLE_IDENTIFIER = )[^;]+;/\\1${BUNDLE_ID};/g" "$PBX" || true
-          echo "✅ Set PRODUCT_BUNDLE_IDENTIFIER=${BUNDLE_ID}"
-        fi
+            cd "${APP_DIR}"
+            PBX="ios/Runner.xcodeproj/project.pbxproj"
+            if [ -f "$PBX" ]; then
+              if [ "$(uname)" = "Darwin" ]; then SED=( -i '' ); else SED=( -i ); fi
+              sed "${SED[@]}" -E "s/(PRODUCT_BUNDLE_IDENTIFIER = )[^;]+;/\\1${BUNDLE_ID};/g" "$PBX" || true
+              echo "✅ Set PRODUCT_BUNDLE_IDENTIFIER=${BUNDLE_ID}"
+            fi
 
-        # helpful guide for Cursor
-        cat > AGENTS.md << 'MD'
+            # helpful guide for Cursor
+            cat > AGENTS.md << 'MD'
 - Edit in-place only (no project creation).
 - Use lib/features/** structure.
 - Honor the app idea from the hint.
 - Keep flutter analyze and tests passing.
 MD
-      '''
+          '''
+        }
+      }
     }
-  }
-}
 
 
 
-stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTINEL)') {
-  options { timeout(time: 30, unit: 'MINUTES') }
-  steps {
-    withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin", "CURSOR_CI=1"]) {
-      sh '''
+    stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTINEL)') {
+      options { timeout(time: 30, unit: 'MINUTES') }
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin", "CURSOR_CI=1"]) {
+          sh '''
         set -euo pipefail
         export CURSOR_API_KEY="${CURSOR_API_KEY}"
         export CURSOR_NO_INTERACTIVE=1
@@ -595,15 +594,15 @@ DART
 
           i=$((i+1))
         done
-      '''
+          '''
+        }
+      }
     }
-  }
-}
 
-stage('Final Integration Validation') {
-  steps {
-    withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
-      sh '''
+    stage('Final Integration Validation') {
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+          sh '''
         set -euo pipefail
         APP_DIR="$(cat out/app_dir.txt)"
         cd "${APP_ROOT}/${APP_DIR}"
@@ -646,22 +645,22 @@ stage('Final Integration Validation') {
             --stage-success "true" \
             --db-path "${WORKSPACE}/pipeline_metrics.db" || true
         fi
-      '''
+          '''
+        }
+      }
     }
-  }
-}
 
-stage('Build iOS (no codesign) with auto-fix loop') {
-  options { timeout(time: 45, unit: 'MINUTES') }
-  environment {
-    CURSOR_CI = '1'
-    CURSOR_NO_INTERACTIVE = '1'
-    CURSOR_EXIT_ON_COMPLETION = '1'
-    TERM = 'xterm-256color'
-  }
-  steps {
-    withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
-      sh '''#!/usr/bin/env bash
+    stage('Build iOS (no codesign) with auto-fix loop') {
+      options { timeout(time: 45, unit: 'MINUTES') }
+      environment {
+        CURSOR_CI = '1'
+        CURSOR_NO_INTERACTIVE = '1'
+        CURSOR_EXIT_ON_COMPLETION = '1'
+        TERM = 'xterm-256color'
+      }
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+          sh '''#!/usr/bin/env bash
 set -euo pipefail
 
 # Resolve project dir (works even if APP_ROOT isn't defined in the pipeline)
@@ -802,16 +801,18 @@ if [ "${ENABLE_PIPELINE_MONITORING}" = "1" ]; then
     --stage-success "true" \
     --db-path "${WORKSPACE}/pipeline_metrics.db" || true
 fi
-'''
+          '''
+        }
+      }
     }
 
-  stage('Pipeline Health Monitoring & Reporting') {
-    when {
-      expression { env.ENABLE_PIPELINE_MONITORING == '1' }
-    }
-    steps {
-      withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
-        sh '''
+    stage('Pipeline Health Monitoring & Reporting') {
+      when {
+        expression { env.ENABLE_PIPELINE_MONITORING == '1' }
+      }
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+          sh '''
           set -euo pipefail
           APP_DIR="$(cat out/app_dir.txt)"
           cd "${APP_ROOT}/${APP_DIR}"
@@ -850,11 +851,11 @@ fi
             --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           
           echo "Pipeline monitoring completed"
-        '''
+          '''
+        }
       }
     }
   }
-}}
 
   post {
     success {
