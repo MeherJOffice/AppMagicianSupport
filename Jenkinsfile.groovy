@@ -15,6 +15,8 @@ pipeline {
     booleanParam(name: 'TEST_MODE', defaultValue: false, description: 'Enable test mode (bypasses API calls, generates mock data)')
     booleanParam(name: 'STRICT_LINTING', defaultValue: false, description: 'Enable strict linting (fail on warnings, not just errors)')
     booleanParam(name: 'STRICT_VALIDATION', defaultValue: true, description: 'Enable strict validation (fail build on validation failures)')
+    booleanParam(name: 'ENABLE_PIPELINE_MONITORING', defaultValue: true, description: 'Enable pipeline health monitoring and metrics collection')
+    booleanParam(name: 'GENERATE_PIPELINE_REPORT', defaultValue: true, description: 'Generate comprehensive pipeline health report at the end')
 
   }
 
@@ -26,6 +28,10 @@ pipeline {
     DEBUG_MODE = '1'                                     // Enable debug output
     TEST_MODE = "${params.TEST_MODE ? '1' : '0'}"       // Pass test mode parameter
     STRICT_VALIDATION = "${params.STRICT_VALIDATION ? '1' : '0'}"  // Pass strict validation parameter
+    ENABLE_PIPELINE_MONITORING = "${params.ENABLE_PIPELINE_MONITORING ? '1' : '0'}"  // Pass pipeline monitoring parameter
+    GENERATE_PIPELINE_REPORT = "${params.GENERATE_PIPELINE_REPORT ? '1' : '0'}"  // Pass pipeline report parameter
+    PIPELINE_ID = "${BUILD_NUMBER}_${BUILD_TIMESTAMP}"    // Unique pipeline identifier
+    PIPELINE_START_TIME = "${System.currentTimeMillis()}" // Pipeline start timestamp
   }
 
   options { timestamps(); ansiColor('xterm'); disableConcurrentBuilds() }
@@ -44,6 +50,27 @@ pipeline {
             which cursor-agent  || { echo "❌ cursor-agent not found"; exit 1; }
             xcodebuild -version >/dev/null
             mkdir -p out
+          '''
+        }
+      }
+    }
+
+    stage('Initialize Pipeline Monitoring') {
+      when {
+        expression { env.ENABLE_PIPELINE_MONITORING == '1' }
+      }
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+          sh '''
+            set -euo pipefail
+            echo "📊 Initializing pipeline monitoring..."
+            echo "Pipeline ID: $PIPELINE_ID"
+            echo "Start Time: $PIPELINE_START_TIME"
+            
+            # Initialize pipeline monitoring database
+            python3 "${WORKSPACE}/Python/pipeline_monitor.py" --init-db --db-path "${WORKSPACE}/pipeline_metrics.db"
+            
+            echo "✅ Pipeline monitoring initialized"
           '''
         }
       }
@@ -419,6 +446,9 @@ DART
           echo "-------------------------------"
           sed -n '1,180p' .prompt.txt || true
 
+          # Record step start time for monitoring
+          STEP_START_TIME=$(date +%s)
+          
           run_cursor || true
           flatten_if_nested
 
@@ -485,6 +515,19 @@ DART
             fi
           fi
 
+          # Record step metrics for monitoring
+          if [ "${ENABLE_PIPELINE_MONITORING}" = "1" ]; then
+            STEP_END_TIME=$(date +%s)
+            STEP_DURATION=$((STEP_END_TIME - STEP_START_TIME))
+            
+            echo "📊 Recording metrics for step ${STEP_NO}..."
+            python3 "${WORKSPACE}/Python/pipeline_monitor.py" --record-step \
+              --step-number "${STEP_NO}" \
+              --step-duration "${STEP_DURATION}" \
+              --step-success "$([ $? -eq 0 ] && echo 'true' || echo 'false')" \
+              --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+          fi
+
           i=$((i+1))
         done
       '''
@@ -502,6 +545,9 @@ stage('Final Integration Validation') {
         
         echo "🔍 Running final integration validation..."
         echo "=========================================="
+        
+        # Record validation start time
+        VALIDATION_START_TIME=$(date +%s)
         
         # Run comprehensive integration validation
         python3 "${WORKSPACE}/Python/validate_integration.py" || {
@@ -522,6 +568,19 @@ stage('Final Integration Validation') {
         
         echo "✅ Final integration validation passed"
         echo "=========================================="
+        
+        # Record validation metrics for monitoring
+        if [ "${ENABLE_PIPELINE_MONITORING}" = "1" ]; then
+          VALIDATION_END_TIME=$(date +%s)
+          VALIDATION_DURATION=$((VALIDATION_END_TIME - VALIDATION_START_TIME))
+          
+          echo "📊 Recording integration validation metrics..."
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --record-stage \
+            --stage-name "integration_validation" \
+            --stage-duration "${VALIDATION_DURATION}" \
+            --stage-success "true" \
+            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+        fi
       '''
     }
   }
@@ -643,6 +702,9 @@ PROMPT
   fi
 }
 
+# Record build start time
+BUILD_START_TIME=$(date +%s)
+
 # -------- Auto-fix loop --------
 ATTEMPT=1
 MAX_ATTEMPTS=2
@@ -655,6 +717,19 @@ until run_checks; do
   ask_cursor_fix_generic
   ATTEMPT=$((ATTEMPT+1))
 done
+
+# Record build metrics for monitoring
+if [ "${ENABLE_PIPELINE_MONITORING}" = "1" ]; then
+  BUILD_END_TIME=$(date +%s)
+  BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
+  
+  echo "📊 Recording build metrics..."
+  python3 "${WORKSPACE}/Python/pipeline_monitor.py" --record-stage \
+    --stage-name "ios_build" \
+    --stage-duration "${BUILD_DURATION}" \
+    --stage-success "true" \
+    --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+fi
 '''
     }
   }
@@ -662,6 +737,56 @@ done
 
 
 
+  }
+
+  stage('Pipeline Health Monitoring & Reporting') {
+    when {
+      expression { env.ENABLE_PIPELINE_MONITORING == '1' }
+    }
+    steps {
+      withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+        sh '''
+          set -euo pipefail
+          APP_DIR="$(cat out/app_dir.txt)"
+          cd "${APP_ROOT}/${APP_DIR}"
+          
+          echo "📊 Collecting comprehensive pipeline metrics..."
+          echo "=============================================="
+          
+          # Collect current metrics and save to database
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --collect-metrics \
+            --app-root "${APP_ROOT}/${APP_DIR}" \
+            --pipeline-id "${PIPELINE_ID}" \
+            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+          
+          # Generate health report if requested
+          if [ "${GENERATE_PIPELINE_REPORT}" = "1" ]; then
+            echo "📋 Generating comprehensive pipeline health report..."
+            python3 "${WORKSPACE}/Python/pipeline_monitor.py" --report \
+              --db-path "${WORKSPACE}/pipeline_metrics.db" > "${WORKSPACE}/pipeline_health_report.txt" || true
+            
+            echo "📊 Pipeline Health Report:"
+            echo "========================="
+            cat "${WORKSPACE}/pipeline_health_report.txt" || true
+            echo "========================="
+          fi
+          
+          # Generate dashboard view
+          echo "📈 Pipeline Dashboard:"
+          echo "====================="
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --dashboard \
+            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+          echo "====================="
+          
+          # Export metrics for historical analysis
+          echo "💾 Exporting metrics for historical analysis..."
+          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --export json \
+            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+          
+          echo "✅ Pipeline monitoring completed"
+        '''
+      }
+    }
   }
 
   post {

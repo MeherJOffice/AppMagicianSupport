@@ -822,6 +822,62 @@ EXIT CODES:
         help='Initialize database only'
     )
     
+    parser.add_argument(
+        '--collect-metrics',
+        action='store_true',
+        help='Collect current metrics and save to database'
+    )
+    
+    parser.add_argument(
+        '--pipeline-id',
+        help='Pipeline identifier for metrics collection'
+    )
+    
+    parser.add_argument(
+        '--record-step',
+        action='store_true',
+        help='Record step metrics'
+    )
+    
+    parser.add_argument(
+        '--step-number',
+        type=int,
+        help='Step number for recording'
+    )
+    
+    parser.add_argument(
+        '--step-duration',
+        type=int,
+        help='Step duration in seconds'
+    )
+    
+    parser.add_argument(
+        '--step-success',
+        help='Step success status (true/false)'
+    )
+    
+    parser.add_argument(
+        '--record-stage',
+        action='store_true',
+        help='Record stage metrics'
+    )
+    
+    parser.add_argument(
+        '--stage-name',
+        help='Stage name for recording'
+    )
+    
+    parser.add_argument(
+        '--stage-duration',
+        type=int,
+        help='Stage duration in seconds'
+    )
+    
+    parser.add_argument(
+        '--stage-success',
+        help='Stage success status (true/false)'
+    )
+    
     args = parser.parse_args()
     
     # Get app directory from environment or use default
@@ -841,6 +897,56 @@ EXIT CODES:
     # If only initializing database, exit
     if args.init_db:
         print("✅ Database initialized successfully")
+        sys.exit(0)
+    
+    # Handle step recording
+    if args.record_step:
+        if not all([args.step_number, args.step_duration, args.step_success]):
+            print("❌ Step recording requires --step-number, --step-duration, and --step-success")
+            sys.exit(1)
+        
+        print(f"📊 Recording step {args.step_number} metrics...")
+        # For now, just log the step metrics (could be enhanced to store in database)
+        print(f"  Step: {args.step_number}")
+        print(f"  Duration: {args.step_duration}s")
+        print(f"  Success: {args.step_success}")
+        print("✅ Step metrics recorded")
+        sys.exit(0)
+    
+    # Handle stage recording
+    if args.record_stage:
+        if not all([args.stage_name, args.stage_duration, args.stage_success]):
+            print("❌ Stage recording requires --stage-name, --stage-duration, and --stage-success")
+            sys.exit(1)
+        
+        print(f"📊 Recording stage '{args.stage_name}' metrics...")
+        # For now, just log the stage metrics (could be enhanced to store in database)
+        print(f"  Stage: {args.stage_name}")
+        print(f"  Duration: {args.stage_duration}s")
+        print(f"  Success: {args.stage_success}")
+        print("✅ Stage metrics recorded")
+        sys.exit(0)
+    
+    # Handle metrics collection
+    if args.collect_metrics:
+        # Use provided pipeline ID or generate one
+        pipeline_id = args.pipeline_id or f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        print(f"📊 Collecting metrics for pipeline: {pipeline_id}")
+        
+        # Collect current metrics
+        if not monitor.collect_current_metrics(app_root):
+            print("❌ Failed to collect metrics")
+            sys.exit(1)
+        
+        # Update pipeline ID if provided
+        if args.pipeline_id:
+            monitor.current_metrics.pipeline_id = args.pipeline_id
+        
+        # Save metrics to database
+        monitor.save_metrics()
+        
+        print("✅ Metrics collected and saved successfully")
         sys.exit(0)
     
     # Collect current metrics
