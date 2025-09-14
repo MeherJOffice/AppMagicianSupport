@@ -158,7 +158,7 @@ stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTI
         export CURSOR_EXIT_ON_COMPLETION=1
         export TERM=xterm-256color
 
-        APP_DIR="$(cat out/app_dir.txt)"
+        APP_DIR="\$(cat out/app_dir.txt)"
         cd "${APP_ROOT}/${APP_DIR}"
 
         SPEC="${WORKSPACE}/out/app_spec.json"
@@ -594,7 +594,7 @@ stage('Final Integration Validation') {
     withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
       sh '''
         set -euo pipefail
-        APP_DIR="$(cat out/app_dir.txt)"
+        APP_DIR="\$(cat out/app_dir.txt)"
         cd "${APP_ROOT}/${APP_DIR}"
         
         echo "🔍 Running final integration validation..."
@@ -793,59 +793,53 @@ fi
     }
     steps {
       withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
-        sh ''
+        sh '''
           set -euo pipefail
-          APP_DIR="$(cat out/app_dir.txt)"
-          cd "${APP_ROOT}/${APP_DIR}"
+          APP_DIR="\$(cat out/app_dir.txt)"
+          cd "\${APP_ROOT}/\${APP_DIR}"
           
-          echo "📊 Collecting comprehensive pipeline metrics..."
+          echo "Collecting comprehensive pipeline metrics..."
           echo "=============================================="
           
           # Collect current metrics and save to database
-          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --collect-metrics 
-            --app-root "${APP_ROOT}/${APP_DIR}" 
-            --pipeline-id "${PIPELINE_ID}" 
-            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+          python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --collect-metrics 
+            --app-root "\${APP_ROOT}/\${APP_DIR}" 
+            --pipeline-id "\${PIPELINE_ID}" 
+            --db-path "\${WORKSPACE}/pipeline_metrics.db" || true
           
           # Generate health report if requested
-          if [ "${GENERATE_PIPELINE_REPORT}" = "1" ]; then
-            echo "📋 Generating comprehensive pipeline health report..."
-            python3 "${WORKSPACE}/Python/pipeline_monitor.py" --report 
-              --db-path "${WORKSPACE}/pipeline_metrics.db" > "${WORKSPACE}/pipeline_health_report.txt" || true
+          if [ "\${GENERATE_PIPELINE_REPORT}" = "1" ]; then
+            echo "Generating comprehensive pipeline health report..."
+            python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --report 
+              --db-path "\${WORKSPACE}/pipeline_metrics.db" > "\${WORKSPACE}/pipeline_health_report.txt" || true
             
-            echo "📊 Pipeline Health Report:"
+            echo "Pipeline Health Report:"
             echo "========================="
-            cat "${WORKSPACE}/pipeline_health_report.txt" || true
+            cat "\${WORKSPACE}/pipeline_health_report.txt" || true
             echo "========================="
           fi
           
           # Generate dashboard view
-          echo "📈 Pipeline Dashboard:"
+          echo "Pipeline Dashboard:"
           echo "====================="
-          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --dashboard 
-            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+          python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --dashboard 
+            --db-path "\${WORKSPACE}/pipeline_metrics.db" || true
           echo "====================="
           
           # Export metrics for historical analysis
-          echo "💾 Exporting metrics for historical analysis..."
-          python3 "${WORKSPACE}/Python/pipeline_monitor.py" --export json 
-            --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+          echo "Exporting metrics for historical analysis..."
+          python3 "\${WORKSPACE}/Python/pipeline_monitor.py" --export json 
+            --db-path "\${WORKSPACE}/pipeline_metrics.db" || true
           
-          echo "✅ Pipeline monitoring completed"
+          echo "Pipeline monitoring completed"
         ''
       }
     }
-  }  }
+  }
 
   post {
     success {
-      sh '''
-        set -euo pipefail
-        APP_DIR="$(cat out/app_dir.txt)"
-        DEST="${APP_ROOT}/${APP_DIR}"
-        echo "✅ Build complete in: $DEST"
-        open "$DEST" || true
-      '''
+      echo '✅ Build complete'
     }
     failure { echo '❌ Failed. Check the last analyze/test tail or flatten message above.' }
   }
