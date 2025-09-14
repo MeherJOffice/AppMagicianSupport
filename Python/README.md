@@ -17,6 +17,8 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   - `BUNDLE_ID`: iOS bundle identifier
   - `LOCALES`: Comma-separated locale codes
   - `DEFAULT_LOCALE`: Default locale
+  - `TEST_MODE`: Set to '1' for testing without API keys (generates mock response)
+  - `DEBUG_MODE`: Set to '1' to enable debug output
 
 ### `cursor_fix.py`
 - **Purpose**: Automatically fixes Flutter analyze and test issues using cursor-agent

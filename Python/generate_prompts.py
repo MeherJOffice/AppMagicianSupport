@@ -20,14 +20,6 @@ def main():
     deepseek_model = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
     api_key = os.environ.get('OPENAI_API_KEY') if provider == 'chatgpt' else os.environ.get('DEEPSEEK_API_KEY')
     
-    if not api_key:
-        print("Missing API key for provider", provider, file=sys.stderr)
-        sys.exit(1)
-
-    url = "https://api.openai.com/v1/chat/completions" if provider == 'chatgpt' else "https://api.deepseek.com/chat/completions"
-    model = openai_model if provider == 'chatgpt' else deepseek_model
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-
     # Inputs from Jenkins params/env (all optional)
     prompt_hint = os.environ.get('APP_IDEA', '').strip()
     bundle_id = os.environ.get('BUNDLE_ID', 'com.example.generated').strip()
@@ -36,6 +28,56 @@ def main():
     locales = [x.strip() for x in (locales_str.split(',') if locales_str else [default_locale]) if x.strip()]
     if not locales:
         locales = ['en']
+
+    # Debug: Print environment variables (only in debug mode)
+    if os.environ.get('DEBUG_MODE') == '1':
+        print(f"DEBUG: LLM_PROVIDER={provider}", file=sys.stderr)
+        print(f"DEBUG: OPENAI_MODEL={openai_model}", file=sys.stderr)
+        print(f"DEBUG: DEEPSEEK_MODEL={deepseek_model}", file=sys.stderr)
+        print(f"DEBUG: API_KEY present={bool(api_key)}", file=sys.stderr)
+        print(f"DEBUG: APP_IDEA='{prompt_hint}'", file=sys.stderr)
+        print(f"DEBUG: BUNDLE_ID='{bundle_id}'", file=sys.stderr)
+        print(f"DEBUG: LOCALES='{locales_str}'", file=sys.stderr)
+    
+    if not api_key:
+        print("Missing API key for provider", provider, file=sys.stderr)
+        # For testing purposes, create a mock response
+        if os.environ.get('TEST_MODE') == '1':
+            print("TEST_MODE enabled - generating mock response", file=sys.stderr)
+            obj = {
+                "app_name": "test_todo_app",
+                "spec": {"theme": "light", "locale": locales[0], "platforms": ["ios"], "features": ["utility"]},
+                "cursor_prompts": [
+                    "Edit pubspec.yaml: add dependencies for state management and UI components.",
+                    "Create lib/main.dart: set up MaterialApp with theme and routing.",
+                    "Create lib/features/todo/todo_model.dart: define Todo data model.",
+                    "Create lib/features/todo/todo_service.dart: implement CRUD operations.",
+                    "Create lib/features/todo/todo_list_widget.dart: display list of todos.",
+                    "Create lib/features/todo/todo_form_widget.dart: add/edit todo form.",
+                    "Write test/features/todo/todo_service_test.dart: unit tests for service.",
+                    "Write test/features/todo/todo_widget_test.dart: widget tests for UI."
+                ],
+                "meta": {
+                    "requested_locales": locales,
+                    "bundle_id_hint": bundle_id,
+                    "feature_summary": prompt_hint or "Implement todo app feature."
+                }
+            }
+            os.makedirs("out", exist_ok=True)
+            with open("out/app_spec.json", "w", encoding="utf-8") as f:
+                json.dump(obj, f, indent=2, ensure_ascii=False)
+            with open("out/app_dir.txt", "w") as f:
+                f.write(obj.get("app_name", "test_app"))
+            print("Provider:", provider)
+            print("Model:", "test-mode")
+            print("App name:", obj.get("app_name"))
+            print("Prompts:", len(obj.get("cursor_prompts", [])))
+            return
+        sys.exit(1)
+
+    url = "https://api.openai.com/v1/chat/completions" if provider == 'chatgpt' else "https://api.deepseek.com/chat/completions"
+    model = openai_model if provider == 'chatgpt' else deepseek_model
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
     # ---- Validation helpers ----
     FORBIDDEN = [
@@ -152,10 +194,27 @@ Return JSON EXACTLY with keys:
             {"role": "user", "content": user_msg}
         ]}
         try:
+            if os.environ.get('DEBUG_MODE') == '1':
+                print(f"DEBUG: Attempting API call {attempts}/3", file=sys.stderr)
             data = call_api(body)
             content = strip_code_fences(data["choices"][0]["message"]["content"])
+            if os.environ.get('DEBUG_MODE') == '1':
+                print(f"DEBUG: API response length: {len(content)}", file=sys.stderr)
             obj = json.loads(content)
+            if os.environ.get('DEBUG_MODE') == '1':
+                print(f"DEBUG: Parsed JSON successfully", file=sys.stderr)
+        except json.JSONDecodeError as e:
+            if os.environ.get('DEBUG_MODE') == '1':
+                print(f"DEBUG: JSON decode error: {e}", file=sys.stderr)
+                print(f"DEBUG: Content preview: {content[:200]}...", file=sys.stderr)
+            if provider == 'chatgpt' and model != 'gpt-4o-mini':
+                model = 'gpt-4o-mini'
+                continue
+            print("LLM response was not valid JSON:", e, file=sys.stderr)
+            sys.exit(1)
         except Exception as e:
+            if os.environ.get('DEBUG_MODE') == '1':
+                print(f"DEBUG: API call failed: {e}", file=sys.stderr)
             if provider == 'chatgpt' and model != 'gpt-4o-mini':
                 model = 'gpt-4o-mini'
                 continue
@@ -163,7 +222,11 @@ Return JSON EXACTLY with keys:
             sys.exit(1)
 
         prompts = obj.get("cursor_prompts", [])
+        if os.environ.get('DEBUG_MODE') == '1':
+            print(f"DEBUG: Got {len(prompts)} prompts from LLM", file=sys.stderr)
         ok, why = set_is_valid(prompts)
+        if os.environ.get('DEBUG_MODE') == '1':
+            print(f"DEBUG: Validation result: ok={ok}, issues={why}", file=sys.stderr)
         if ok:
             break
         # corrective re-ask
