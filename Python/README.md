@@ -176,6 +176,36 @@ This folder contains Python scripts that were extracted from the Jenkins pipelin
   python3 Python/validate_navigation.py --app-root /path/to/app
   ```
 
+### `verify_build.py`
+- **Purpose**: Verifies Flutter app builds correctly across all platforms
+- **Usage**: Command line tool to check build process and artifacts
+- **Arguments**:
+  - `--app-root`: Path to app root directory (optional)
+  - `--verbose`: Enable verbose output (optional)
+  - `--skip-ios`: Skip iOS build verification (optional)
+  - `--skip-tests`: Skip test execution (optional)
+- **Environment Variables**:
+  - `APP_DIR`: App directory name (default: 'test_todo_app')
+  - `APP_ROOT`: Full path to app root (default: '$HOME/AppMagician/$APP_DIR')
+- **Build Verification Checks**:
+  - Flutter clean (clean build environment)
+  - Flutter pub get (dependency resolution)
+  - Flutter analyze (compilation errors)
+  - Flutter test (all tests pass)
+  - iOS build (iOS app generation, macOS only)
+  - Generated files (essential build artifacts)
+  - App installation (file integrity)
+- **Exit Codes**:
+  - `0`: All build verification checks passed
+  - `1`: One or more build verification checks failed
+- **Examples**:
+  ```bash
+  python3 Python/verify_build.py
+  python3 Python/verify_build.py --skip-tests
+  python3 Python/verify_build.py --skip-ios --verbose
+  python3 Python/verify_build.py --app-root /path/to/app
+  ```
+
 ## Requirements
 
 - Python 3.6+
