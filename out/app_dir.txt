@@ -1,1 +1,1 @@
-test_todo_app
+generated_app

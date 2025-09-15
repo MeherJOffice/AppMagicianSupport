@@ -10,15 +10,41 @@ import os
 import signal
 import selectors
 import time
+import argparse
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Cursor run script for AppMagician pipeline')
+    parser.add_argument('--prompt-file', default='.prompt.txt', help='Path to prompt file (default: .prompt.txt)')
+    parser.add_argument('--app-root', help='Path to app root directory')
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose output')
+    
+    args = parser.parse_args()
+    
     SENTINEL = b"~~CURSOR_DONE~~"
     
-    with open('.prompt.txt', 'r', encoding='utf-8') as f:
-        prompt = f.read()
+    # Check if prompt file exists
+    if not os.path.exists(args.prompt_file):
+        print(f"Error: Prompt file '{args.prompt_file}' not found")
+        print("Usage: python3 cursor_run.py [--prompt-file PATH] [--app-root PATH] [--verbose]")
+        sys.exit(1)
     
-    cmd = ["cursor-agent", "-p", "--force", "--output-format", "text", prompt]
+    try:
+        with open(args.prompt_file, 'r', encoding='utf-8') as f:
+            prompt = f.read()
+    except Exception as e:
+        print(f"Error reading prompt file: {e}")
+        sys.exit(1)
+    
+    if args.verbose:
+        print(f"Using prompt file: {args.prompt_file}")
+        print(f"Prompt content length: {len(prompt)} characters")
+    
+    # Use cursor command instead of cursor-agent
+    cmd = ["cursor", "--wait", "--new-window"]
+    if args.app_root:
+        cmd.append(args.app_root)
+    
     env = os.environ.copy()
     env.update({
         'CURSOR_CI': '1',
@@ -35,12 +61,22 @@ def main():
     p = subprocess.Popen(
         cmd,
         preexec_fn=os.setsid,
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=False,
         bufsize=0,
         env=env
     )
+    
+    # Send prompt to stdin
+    try:
+        p.stdin.write(prompt.encode('utf-8'))
+        p.stdin.close()
+    except Exception as e:
+        if args.verbose:
+            print(f"Warning: Could not send prompt to stdin: {e}")
+    
     sel.register(p.stdout, selectors.EVENT_READ)
     sel.register(p.stderr, selectors.EVENT_READ)
 

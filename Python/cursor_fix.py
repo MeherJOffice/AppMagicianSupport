@@ -10,16 +10,46 @@ import os
 import signal
 import selectors
 import time
+import argparse
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Cursor auto-fix script for AppMagician pipeline')
+    parser.add_argument('--analyze-file', default='.an.tail', help='Path to analyze output file (default: .an.tail)')
+    parser.add_argument('--test-file', default='.ts.tail', help='Path to test output file (default: .ts.tail)')
+    parser.add_argument('--app-root', help='Path to app root directory')
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose output')
+    
+    args = parser.parse_args()
+    
     SENTINEL = b"~~CURSOR_DONE~~"
     step = os.environ.get('STEP', '?')
     
-    with open('.an.tail', 'r', encoding='utf-8', errors='ignore') as f:
-        an = f.read()
-    with open('.ts.tail', 'r', encoding='utf-8', errors='ignore') as f:
-        ts = f.read()
+    # Check if files exist, use empty strings if not
+    an = ""
+    ts = ""
+    
+    if os.path.exists(args.analyze_file):
+        try:
+            with open(args.analyze_file, 'r', encoding='utf-8', errors='ignore') as f:
+                an = f.read()
+        except Exception as e:
+            if args.verbose:
+                print(f"Warning: Could not read analyze file: {e}")
+    else:
+        if args.verbose:
+            print(f"Warning: Analyze file '{args.analyze_file}' not found")
+    
+    if os.path.exists(args.test_file):
+        try:
+            with open(args.test_file, 'r', encoding='utf-8', errors='ignore') as f:
+                ts = f.read()
+        except Exception as e:
+            if args.verbose:
+                print(f"Warning: Could not read test file: {e}")
+    else:
+        if args.verbose:
+            print(f"Warning: Test file '{args.test_file}' not found")
 
     prompt = f"""You are a senior Flutter engineer. The previous step ({step}) introduced issues.
 Fix the codebase while preserving the intended feature.
@@ -42,7 +72,11 @@ Error snippets:
 {ts}
 """
 
-    cmd = ["cursor-agent", "-p", "--force", "--output-format", "text", prompt]
+    # Use cursor command instead of cursor-agent
+    cmd = ["cursor", "--wait", "--new-window"]
+    if args.app_root:
+        cmd.append(args.app_root)
+    
     env = os.environ.copy()
     env.update({
         'CURSOR_CI': '1',
@@ -59,12 +93,21 @@ Error snippets:
     p = subprocess.Popen(
         cmd,
         preexec_fn=os.setsid,
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=False,
         bufsize=0,
         env=env
     )
+    # Send prompt to stdin
+    try:
+        p.stdin.write(prompt.encode('utf-8'))
+        p.stdin.close()
+    except Exception as e:
+        if args.verbose:
+            print(f"Warning: Could not send prompt to stdin: {e}")
+    
     sel.register(p.stdout, selectors.EVENT_READ)
     sel.register(p.stderr, selectors.EVENT_READ)
 

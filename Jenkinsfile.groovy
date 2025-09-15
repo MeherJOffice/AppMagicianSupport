@@ -87,15 +87,25 @@ pipeline {
       }
     }
 
-    stage('Generate idea + prompts (ChatGPT or DeepSeek)') {
+    stage('Generate dynamic AI prompts (Conversational AI system)') {
       steps {
         withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
           sh '''
             set -euo pipefail
-            python3 "${WORKSPACE}/Python/generate_prompts.py"
-            echo '------ app_spec.json ------'
-            cat out/app_spec.json || true
-            echo '---------------------------'
+            
+            # Use dynamic AI prompt system for conversational prompt generation
+            python3 "${WORKSPACE}/Python/dynamic_ai_prompt_system.py" \
+              --app-idea "${APP_IDEA}" \
+              --archetype "utility" \
+              --provider "${LLM_PROVIDER}" \
+              --api-key "${OPENAI_API_KEY}" \
+              --app-root "${APP_ROOT}" \
+              --output "out/dynamic_strategy.json" \
+              --verbose
+            
+            echo '------ Dynamic AI Strategy ------'
+            cat out/dynamic_strategy.json || true
+            echo '--------------------------------'
           '''
         }
       }
@@ -157,8 +167,8 @@ MD
 
 
 
-    stage('Run Cursor prompts (one-by-one with checks, auto-fix, anti-nesting, SENTINEL)') {
-      options { timeout(time: 45, unit: 'MINUTES') }
+    stage('Run Dynamic Cursor AI Pipeline (Conversational AI execution)') {
+      options { timeout(time: 60, unit: 'MINUTES') }
       steps {
         withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin", "CURSOR_CI=1"]) {
           sh '''
@@ -169,13 +179,31 @@ MD
         export TERM=xterm-256color
 
         APP_DIR="$(cat out/app_dir.txt)"
-        cd "${APP_ROOT}/${APP_DIR}"
+        APP_ROOT_PATH="${APP_ROOT}/${APP_DIR}"
+        cd "${APP_ROOT_PATH}"
 
-        SPEC="${WORKSPACE}/out/app_spec.json"
-        [ -s "$SPEC" ] || { echo "No app_spec.json found; aborting."; exit 1; }
-
-        COUNT=$(jq '.cursor_prompts | length' "$SPEC")
-        echo "Found $COUNT prompts."
+        # Check if dynamic strategy exists
+        STRATEGY="${WORKSPACE}/out/dynamic_strategy.json"
+        if [ -s "$STRATEGY" ]; then
+          echo "🚀 Using dynamic AI strategy..."
+          COUNT=$(jq '.prompts | length' "$STRATEGY")
+          echo "Found $COUNT dynamic prompts."
+          
+          # Run dynamic cursor pipeline
+          python3 "${WORKSPACE}/Python/cursor_ai_integration.py" \
+            --app-idea "${APP_IDEA}" \
+            --archetype "utility" \
+            --provider "${LLM_PROVIDER}" \
+            --api-key "${OPENAI_API_KEY}" \
+            --app-root "${APP_ROOT_PATH}" \
+            --output "out/dynamic_cursor_report.json" \
+            --verbose
+        else
+          echo "⚠️ No dynamic strategy found, falling back to static prompts..."
+          SPEC="${WORKSPACE}/out/app_spec.json"
+          [ -s "$SPEC" ] || { echo "No app_spec.json found; aborting."; exit 1; }
+          COUNT=$(jq '.cursor_prompts | length' "$SPEC")
+          echo "Found $COUNT static prompts."
 
         if [ "$(uname)" = "Darwin" ]; then DEC="base64 -D"; else DEC="base64 -d"; fi
 
@@ -1085,6 +1113,45 @@ fi
             --db-path "${WORKSPACE}/pipeline_metrics.db" || true
           
           echo "Pipeline monitoring completed"
+          '''
+        }
+      }
+    }
+
+    stage('Smart Quality Gates (Production-ready validation)') {
+      options { timeout(time: 10, unit: 'MINUTES') }
+      steps {
+        withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
+          sh '''
+            set -euo pipefail
+            
+            APP_DIR="$(cat out/app_dir.txt)"
+            APP_ROOT="${APP_ROOT}/${APP_DIR}"
+            
+            # Detect app archetype from specification
+            ARCHETYPE=$(jq -r '.archetype // "utility"' out/app_spec.json)
+            
+            echo "🔍 Running smart quality gates for ${ARCHETYPE} app..."
+            
+            # Run smart quality gates
+            python3 "${WORKSPACE}/Python/smart_quality_gates.py" \
+              --app-root "${APP_ROOT}" \
+              --archetype "${ARCHETYPE}" \
+              --output "out/quality_report.txt" \
+              --verbose
+            
+            echo "📊 Quality gates completed"
+            echo "📄 Quality report:"
+            cat out/quality_report.txt || true
+            
+            # Record quality metrics
+            if [ "${ENABLE_PIPELINE_MONITORING}" = "1" ]; then
+              python3 "${WORKSPACE}/Python/pipeline_monitor.py" --record-stage \
+                --stage-name "quality_gates" \
+                --stage-duration "600" \
+                --stage-success "true" \
+                --db-path "${WORKSPACE}/pipeline_metrics.db" || true
+            fi
           '''
         }
       }
