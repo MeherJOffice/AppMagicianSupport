@@ -88,20 +88,40 @@ pipeline {
     }
 
     stage('Generate dynamic AI prompts (Conversational AI system)') {
+      options { timeout(time: 5, unit: 'MINUTES') }
       steps {
         withEnv(["PATH=${env.PATH}:${env.HOME}/.cursor/bin"]) {
           sh '''
             set -euo pipefail
             
+            echo "🚀 Starting dynamic AI prompt generation..."
+            echo "⏰ Timeout: 5 minutes"
+            echo "🔄 Provider: ${LLM_PROVIDER}"
+            
             # Use dynamic AI prompt system for conversational prompt generation
-            python3 "${WORKSPACE}/Python/dynamic_ai_prompt_system.py" \
+            # Add timeout and fallback options
+            timeout 300s python3 "${WORKSPACE}/Python/dynamic_ai_prompt_system.py" \
               --app-idea "${APP_IDEA}" \
               --archetype "utility" \
               --provider "${LLM_PROVIDER}" \
               --api-key "${OPENAI_API_KEY}" \
               --app-root "${APP_ROOT}" \
               --output "out/dynamic_strategy.json" \
-              --verbose
+              --verbose || {
+                echo "⏰ Dynamic AI generation timed out or failed"
+                echo "🔄 Falling back to static prompt generation..."
+                
+                # Set SKIP_AI to force fallback
+                export SKIP_AI=true
+                python3 "${WORKSPACE}/Python/dynamic_ai_prompt_system.py" \
+                  --app-idea "${APP_IDEA}" \
+                  --archetype "utility" \
+                  --provider "${LLM_PROVIDER}" \
+                  --api-key "${OPENAI_API_KEY}" \
+                  --app-root "${APP_ROOT}" \
+                  --output "out/dynamic_strategy.json" \
+                  --verbose
+              }
             
             echo '------ Dynamic AI Strategy ------'
             cat out/dynamic_strategy.json || true

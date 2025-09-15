@@ -55,6 +55,14 @@ class DynamicAIPromptSystem:
     def initialize_conversation(self, app_idea: str, archetype: str) -> Dict[str, Any]:
         """Initialize conversation with AI to get detailed prompt strategy"""
         
+        print(f"🚀 Initializing AI conversation for {archetype} app...")
+        print(f"💡 App idea: {app_idea[:100]}...")
+        
+        # Check if we should skip AI and use fallback immediately
+        if os.environ.get('SKIP_AI', 'false').lower() == 'true':
+            print("⏭️ Skipping AI call (SKIP_AI=true), using fallback strategy")
+            return self._get_fallback_strategy(app_idea, archetype)
+        
         system_prompt = f"""You are an expert Flutter development architect with 15+ years of experience building production iOS apps.
 
 TASK: Generate a comprehensive, step-by-step development strategy for a {archetype} app based on this idea: "{app_idea}"
@@ -114,6 +122,7 @@ The app should be production-ready with:
 
 Please provide the detailed JSON strategy."""
 
+        print("🔄 Attempting AI API call...")
         response = self._call_ai_api(system_prompt, user_prompt)
         
         if response and response.strip():
@@ -355,13 +364,22 @@ Provide a detailed, actionable fix prompt."""
         }
         
         try:
-            response = requests.post(self.base_url, headers=headers, json=data, timeout=60)
+            print(f"🔄 Calling AI API with {self.provider.value}...")
+            response = requests.post(self.base_url, headers=headers, json=data, timeout=30)
             response.raise_for_status()
             
             result = response.json()
-            return result['choices'][0]['message']['content']
+            content = result['choices'][0]['message']['content']
+            print(f"✅ AI API call successful, got {len(content)} characters")
+            return content
+        except requests.exceptions.Timeout:
+            print("⏰ AI API call timed out after 30 seconds")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"🌐 AI API network error: {e}")
+            return None
         except Exception as e:
-            print(f"AI API call failed: {e}")
+            print(f"❌ AI API call failed: {e}")
             return None
     
     def _clean_ai_response(self, response: str) -> str:
