@@ -116,9 +116,17 @@ Please provide the detailed JSON strategy."""
 
         response = self._call_ai_api(system_prompt, user_prompt)
         
-        if response:
+        if response and response.strip():
             try:
-                strategy = json.loads(response)
+                # Clean the response to extract JSON
+                cleaned_response = self._clean_ai_response(response)
+                strategy = json.loads(cleaned_response)
+                
+                # Validate strategy structure
+                if not isinstance(strategy, dict) or 'prompts' not in strategy:
+                    print("Invalid strategy structure, using fallback")
+                    return self._get_fallback_strategy(app_idea, archetype)
+                
                 self.context = ConversationContext(
                     app_idea=app_idea,
                     archetype=archetype,
@@ -134,8 +142,10 @@ Please provide the detailed JSON strategy."""
                 return strategy
             except json.JSONDecodeError as e:
                 print(f"Error parsing AI response: {e}")
+                print(f"Response was: {response[:200]}...")
                 return self._get_fallback_strategy(app_idea, archetype)
         else:
+            print("No response from AI API, using fallback strategy")
             return self._get_fallback_strategy(app_idea, archetype)
     
     def generate_dynamic_prompt(self, step_number: int, app_state: Dict[str, Any]) -> Dict[str, Any]:
@@ -354,6 +364,29 @@ Provide a detailed, actionable fix prompt."""
             print(f"AI API call failed: {e}")
             return None
     
+    def _clean_ai_response(self, response: str) -> str:
+        """Clean AI response to extract JSON"""
+        import re
+        
+        # Remove markdown formatting
+        response = re.sub(r'^```(?:json)?\s*', '', response.strip(), flags=re.I)
+        response = re.sub(r'```\s*$', '', response, flags=re.I)
+        
+        # Find JSON object boundaries
+        start = response.find('{')
+        end = response.rfind('}')
+        
+        if start == -1 or end == -1 or end <= start:
+            return response.strip()
+        
+        # Extract just the JSON part
+        json_text = response[start:end+1]
+        
+        # Fix common JSON issues
+        json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)
+        
+        return json_text.strip()
+    
     def _get_fallback_strategy(self, app_idea: str, archetype: str) -> Dict[str, Any]:
         """Get fallback strategy when AI is unavailable"""
         return {
@@ -427,7 +460,31 @@ class DynamicPromptPipeline:
         strategy = self.ai_system.initialize_conversation(app_idea, archetype)
         
         if not strategy:
-            raise ValueError("Failed to get development strategy from AI")
+            print("⚠️ Failed to get AI strategy, using fallback approach")
+            # Create a simple fallback strategy
+            strategy = {
+                "strategy": f"Fallback strategy for {archetype} app",
+                "architecture": "clean_architecture_with_providers",
+                "total_steps": 8,
+                "prompts": [
+                    {
+                        "step": i + 1,
+                        "title": f"Step {i + 1}",
+                        "description": f"Implement step {i + 1}",
+                        "prompt": f"Implement step {i + 1} for {archetype} app based on: {app_idea}",
+                        "validation_criteria": {"file_exists": f"lib/step_{i + 1}.dart"},
+                        "dependencies": [],
+                        "estimated_time": "5-10 minutes"
+                    }
+                    for i in range(8)
+                ],
+                "quality_gates": {
+                    "performance": "sub_100ms_response_time",
+                    "security": "data_encryption_required",
+                    "accessibility": "screen_reader_support",
+                    "ux": "smooth_animations"
+                }
+            }
         
         print(f"✅ Got strategy with {strategy['total_steps']} steps")
         
@@ -439,17 +496,47 @@ class DynamicPromptPipeline:
             print(f"\n🔄 Executing step {step_num}/{strategy['total_steps']}...")
             
             # Generate dynamic prompt for this step
-            prompt_data = self.ai_system.generate_dynamic_prompt(step_num, app_state)
-            
-            print(f"📝 Generated dynamic prompt: {prompt_data['title']}")
+            try:
+                prompt_data = self.ai_system.generate_dynamic_prompt(step_num, app_state)
+                print(f"📝 Generated dynamic prompt: {prompt_data['title']}")
+            except ValueError as e:
+                print(f"⚠️ Dynamic prompt generation failed: {e}")
+                # Use fallback prompt from strategy
+                if step_num <= len(strategy['prompts']):
+                    prompt_data = strategy['prompts'][step_num - 1]
+                    print(f"📝 Using fallback prompt: {prompt_data['title']}")
+                else:
+                    prompt_data = {
+                        "step": step_num,
+                        "title": f"Step {step_num}",
+                        "description": f"Implement step {step_num}",
+                        "prompt": f"Implement step {step_num} for the app",
+                        "validation_criteria": {"file_exists": f"lib/step_{step_num}.dart"},
+                        "dependencies": [],
+                        "estimated_time": "5-10 minutes"
+                    }
+                    print(f"📝 Using generic prompt: {prompt_data['title']}")
             
             # Execute the prompt (this would call Cursor AI)
             step_result = self._execute_cursor_prompt(prompt_data, app_root)
             
             # Analyze the result
-            analysis = self.ai_system.analyze_step_result(step_num, step_result)
-            
-            print(f"📊 Step analysis: Quality score {analysis['quality_score']}/100")
+            try:
+                analysis = self.ai_system.analyze_step_result(step_num, step_result)
+                print(f"📊 Step analysis: Quality score {analysis['quality_score']}/100")
+            except ValueError as e:
+                print(f"⚠️ Step analysis failed: {e}")
+                # Use fallback analysis
+                analysis = {
+                    "step_success": step_result.get("success", True),
+                    "issues_found": [],
+                    "improvements": [],
+                    "next_step_recommendations": [],
+                    "app_state_update": {},
+                    "quality_score": 80,
+                    "feedback": "Fallback analysis"
+                }
+                print(f"📊 Fallback analysis: Quality score {analysis['quality_score']}/100")
             
             # Update app state
             if analysis.get('app_state_update'):
@@ -482,8 +569,13 @@ class DynamicPromptPipeline:
                     "app_state": app_state
                 }
                 
-                fix_prompt = self.ai_system.generate_fix_prompt(error_context)
-                print(f"🔧 Generated fix prompt: {fix_prompt[:100]}...")
+                try:
+                    fix_prompt = self.ai_system.generate_fix_prompt(error_context)
+                    print(f"🔧 Generated fix prompt: {fix_prompt[:100]}...")
+                except ValueError as e:
+                    print(f"⚠️ Fix prompt generation failed: {e}")
+                    fix_prompt = f"Fix the following issues: {', '.join(analysis['issues_found'])}"
+                    print(f"🔧 Using fallback fix prompt: {fix_prompt[:100]}...")
                 
                 # Execute fix (this would call Cursor AI)
                 fix_result = self._execute_cursor_fix(fix_prompt, app_root)

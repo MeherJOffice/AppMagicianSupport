@@ -182,9 +182,9 @@ MD
         APP_ROOT_PATH="${APP_ROOT}/${APP_DIR}"
         cd "${APP_ROOT_PATH}"
 
-        # Check if dynamic strategy exists
+        # Check if dynamic strategy exists and is valid
         STRATEGY="${WORKSPACE}/out/dynamic_strategy.json"
-        if [ -s "$STRATEGY" ]; then
+        if [ -s "$STRATEGY" ] && jq -e '.prompts' "$STRATEGY" > /dev/null 2>&1; then
           echo "🚀 Using dynamic AI strategy..."
           COUNT=$(jq '.prompts | length' "$STRATEGY")
           echo "Found $COUNT dynamic prompts."
@@ -199,7 +199,17 @@ MD
             --output "out/dynamic_cursor_report.json" \
             --verbose
         else
-          echo "⚠️ No dynamic strategy found, falling back to static prompts..."
+          echo "⚠️ No valid dynamic strategy found, falling back to static prompts..."
+          
+          # Try to generate static prompts as fallback
+          python3 "${WORKSPACE}/Python/smart_prompt_generator.py" \
+            --app-idea "${APP_IDEA}" \
+            --bundle-id "${BUNDLE_ID}" \
+            --locales "${LOCALES}" \
+            --provider "${LLM_PROVIDER}" \
+            --output "out/app_spec.json" \
+            --verbose
+          
           SPEC="${WORKSPACE}/out/app_spec.json"
           [ -s "$SPEC" ] || { echo "No app_spec.json found; aborting."; exit 1; }
           COUNT=$(jq '.cursor_prompts | length' "$SPEC")
